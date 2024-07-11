@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "juwazaku"
+version = "0.1.0"
+description = ""
+authors = ["Excale <dev_excale@hotmail.com>"]
+readme = "README.md"
+packages = [{ include = "juwazaku", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+mediapipe = "^0.10.11"
+pandas = "^2.2.1"
+requests = "^2.31.0"
+ultralytics = "^8.1.45"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
