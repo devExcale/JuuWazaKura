@@ -59,3 +59,17 @@ Le colonne del file sono le seguenti:
 > si consiglia di impostare il formato delle colonne come `testo`.
 > 
 > <img src="/doc/img/excel_text_column.png" style="display: block; margin: auto;"/>
+
+## Esempi
+
+I seguenti video sono estratti dalle finali della competizione
+[_European Judo Championships U23 Sarajevo 2022_](https://www.youtube.com/watch?v=ozvTsftwfGg)
+dell'EJU, giorno 2 tatami 1. La competizione è la stessa del file di esempio scaricabile.
+
+https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-8100-8280-head.mp4
+
+https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-9810-9960-head.mp4
+
+https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-11850-12030-head.mp4
+
+https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-45300-45480-head.mp4
