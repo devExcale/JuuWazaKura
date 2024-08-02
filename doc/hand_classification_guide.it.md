@@ -66,10 +66,10 @@ I seguenti video sono estratti dalle finali della competizione
 [_European Judo Championships U23 Sarajevo 2022_](https://www.youtube.com/watch?v=ozvTsftwfGg)
 dell'EJU, giorno 2 tatami 1. La competizione è la stessa del file di esempio scaricabile.
 
-https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-8100-8280-head.mp4
+https://github.com/user-attachments/assets/aa82cf9c-1bcd-4751-8044-564e5f17bbf0
 
-https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-9810-9960-head.mp4
+https://github.com/user-attachments/assets/4f06e968-541d-45dc-89da-ff9e127a1355
 
-https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-11850-12030-head.mp4
+https://github.com/user-attachments/assets/195e86c3-e0c9-41ef-9783-082fe3a205ca
 
-https://github.com/devExcale/JuuWazaKura/raw/master/doc/img/SAR2210D2T1FIN-45300-45480-head.mp4
+https://github.com/user-attachments/assets/26f10761-b9d8-4fad-bf9e-975f868f4b76
