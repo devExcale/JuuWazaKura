@@ -3,7 +3,7 @@ from typing import Union
 import cv2
 import pandas as pd
 
-from clipcommons import ClipCommons
+from jwk.clipcommons import ClipCommons
 
 
 class Clipper(ClipCommons):
@@ -11,7 +11,7 @@ class Clipper(ClipCommons):
 	Class for generating clips from a video file.
 	"""
 
-	def __init__(self, input_filepath: str, savedir: str, name: str, fps: float) -> None:
+	def __init__(self, input_filepath: str, savedir: str, name: str) -> None:
 		"""
 		Initializes the Clipper object with the video file path.
 		"""
@@ -74,7 +74,9 @@ class Clipper(ClipCommons):
 
 		# Initialize the video writer
 		out_filepath = f"{self.savedir}/{self.name}-{start}-{end}.mp4"
-		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'MP4V'), self.fps, self.frame_size)
+		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
+
+		print(f"Exporting {start}-{end} to {out_filepath}")
 
 		# Read and write the frames to the output video file
 		for i in range(start, end + 1):
@@ -100,14 +102,12 @@ class Clipper(ClipCommons):
 		"""
 
 		# Read the CSV file
-		df = pd.read_csv(csv_path, sep=' ', header=0)
+		df = pd.read_csv(csv_path, sep=',', header=0)
 
 		# Export clips based on the timestamps
 		for row in df.itertuples():
 			start = row.ts_start
 			end = row.ts_end
-
-			print(f"Exporting {start}-{end} to {self.clip_name(start, end)}")
 
 			self.export(start, end, sim=sim)
 

@@ -1,18 +1,10 @@
-from typing import Optional
+from typing import Optional, Any
 
 import cv2
-from mediapipe import solutions as mp_solutions
-from mediapipe.tasks.python.vision import PoseLandmarkerResult
 from numpy import ndarray
 from ultralytics import YOLO
 
-from clipcommons import ClipCommons
-
-mp_drawing = mp_solutions.drawing_utils
-mp_pose = mp_solutions.pose
-
-pose_landmarker_path = 'C:\\Users\\escac\\Projects\\Academics\\jwk\\res\\pose_landmarker_heavy.task'
-
+from ..clipcommons import ClipCommons
 
 class PoseFitter(ClipCommons):
 
@@ -33,7 +25,7 @@ class PoseFitter(ClipCommons):
 
 		self.yolo: Optional[YOLO] = None
 		self.current_frame_bgr: Optional[ndarray] = None
-		self.current_results: Optional[PoseLandmarkerResult] = None
+		self.current_results: Optional[Any] = None
 
 	def __enter__(self) -> 'PoseFitter':
 
@@ -51,7 +43,7 @@ class PoseFitter(ClipCommons):
 		self.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 		self.fps = cap.get(cv2.CAP_PROP_FPS)
 
-		self.yolo = YOLO('C:\\Users\\escac\\Projects\\Academics\\jwk\\res\\yolov8x-pose.pt')
+		self.yolo = YOLO('res/yolov8x-pose.pt')
 
 		return self
 
@@ -97,7 +89,9 @@ class PoseFitter(ClipCommons):
 
 		# Initialize the video writer
 		out_filepath = f"{self.savedir}/{self.name}-posed.mp4"
-		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'MP4V'), self.fps, self.frame_size)
+		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
+
+		print(f"Processing {out_filepath}")
 
 		# Read and write the frames to the output video file
 		while True:
