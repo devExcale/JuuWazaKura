@@ -1,6 +1,7 @@
-from typing import Union
+from typing import Union, Tuple, Optional
 
 import cv2
+import numpy as np
 import pandas as pd
 
 from jwk.clipcommons import ClipCommons
@@ -11,13 +12,14 @@ class Clipper(ClipCommons):
 	Class for generating clips from a video file.
 	"""
 
-	def __init__(self, input_filepath: str, savedir: str, name: str) -> None:
+	def __init__(self, input_filepath: str, savedir: str, name: str, size: Optional[Tuple[int, int]] = None) -> None:
 		"""
 		Initializes the Clipper object with the video file path.
 		"""
 		self.input_filepath = input_filepath
 		self.savedir = savedir
 		self.name = name
+		self.output_size = size
 
 		return
 
@@ -35,6 +37,19 @@ class Clipper(ClipCommons):
 		self.frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
 		self.frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
 		self.fps = cap.get(cv2.CAP_PROP_FPS)
+
+		# Set the output size
+		if self.output_size is not None and len(self.output_size) == 2:
+			w, h = self.output_size
+
+			if w is None and h is None:
+				self.output_size = None
+			elif h is not None:
+				self.output_size = (int(h * self.frame_size[0] / self.frame_size[1]), h)
+			elif w is not None:
+				self.output_size = (w, int(w * self.frame_size[1] / self.frame_size[0]))
+
+		print(f"Output size: {self.output_size}")
 
 		return self
 
@@ -74,15 +89,24 @@ class Clipper(ClipCommons):
 
 		# Initialize the video writer
 		out_filepath = f"{self.savedir}/{self.name}-{start}-{end}.mp4"
-		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
+		out_frame_size = self.output_size or self.frame_size
+		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
 
 		print(f"Exporting {start}-{end} to {out_filepath}")
 
 		# Read and write the frames to the output video file
 		for i in range(start, end + 1):
-			ret, frame = self.cap.read()
-			if not ret:
+
+			ok, frame = self.cap.read()
+			if not ok:
 				break
+
+			# Sharpen the frame
+			frame = sharpen(frame)
+
+			# Resize the frame
+			if self.output_size is not None:
+				frame = cv2.resize(frame, self.output_size)
 
 			out.write(frame)
 
@@ -119,3 +143,9 @@ class Clipper(ClipCommons):
 		"""
 		start, end = self.__ensure_timestamps__(start, end)
 		return f"{self.name}-{start}-{end}.mp4"
+
+
+def sharpen(image: np.ndarray) -> np.ndarray:
+	# Apply the unsharp mask
+	kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+	return cv2.filter2D(image, -1, kernel)

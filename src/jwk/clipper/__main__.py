@@ -34,6 +34,22 @@ parser.add_argument(
 	help='Prefix of the output clips, defaults to the filename of the video',
 	required=False,
 )
+parser.add_argument(
+	'--width', '-w',
+	dest='width',
+	type=int,
+	help='Width of the output clips, defaults to the width of the input video. '
+		 'If the height isn\'t specified, the aspect ratio is preserved.',
+	required=False,
+)
+parser.add_argument(
+	'--height', '-g',
+	dest='height',
+	type=int,
+	help='Height of the output clips, defaults to the height of the input video. '
+		 'If the width isn\'t specified, the aspect ratio is preserved.',
+	required=False,
+)
 
 
 def main():
@@ -48,7 +64,17 @@ def main():
 	if args.name is None:
 		args.name = '.'.join(args.video_path.split('/')[-1].split('.')[:-1])
 
-	with Clipper(args.video_path, args.save_dir, args.name) as clipper:
+	# Get resize dimensions
+	if args.width is not None and args.height is not None:
+		args.output_size = (args.width, args.height)
+	elif args.width is not None:
+		args.output_size = (args.width, None)
+	elif args.height is not None:
+		args.output_size = (None, args.height)
+	else:
+		args.output_size = None
+
+	with Clipper(args.video_path, args.save_dir, args.name, args.output_size) as clipper:
 		clipper.export_from_csv(args.csv_path, sim=False)
 
 
