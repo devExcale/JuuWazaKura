@@ -2,6 +2,7 @@
 export PYTHONPATH=$$PYTHONPATH:src
 
 width_clause = $(if $(width),-w $(width),)
+vid_ext ?= mp4
 
 # Run the clipper module main function
 clipper:
@@ -11,7 +12,7 @@ clipper:
 	fi
 
 	@ mkdir -p target/$(code)
-	python -m jwk.clipper -v dataset/$(code).webm -t dataset/$(code).csv -o target/$(code) --name $(code) $(width_clause)
+	python -m jwk.clipper -v dataset/$(code).$(vid_ext) -t dataset/$(code).csv -o target/$(code) --name $(code) $(width_clause)
 
 
 # Run the posefitter module main function
@@ -24,5 +25,5 @@ posefitter:
 	@ mkdir -p target/$(code)-posed
 
 	for vid in target/$(code)/*.mp4; do \
-		python -m jwk.posefitter -v $$vid -o target/$(code)-posed; \
+		python -m jwk.posefitter -p -i $$vid -o target/$(code)-posed; \
 	done
