@@ -1,40 +1,58 @@
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 
 import cv2
 from numpy import ndarray
 from ultralytics import YOLO
+import pandas as pd
 
 from ..clipcommons import ClipCommons
+from .arguments import PoseFitterArguments
+
 
 class PoseFitter(ClipCommons):
 
 	def __init__(
 			self,
-			input_filepath: str,
-			name: str,
-			savedir: Optional[str] = None,
-			print_fit: bool = False,
-			export_print: bool = True,
+			args: PoseFitterArguments,
 	) -> None:
 
-		self.input_filepath: str = input_filepath
-		self.name = name
-		self.savedir: Optional[str] = savedir
-		self.print_fit: bool = print_fit
-		self.export_print: bool = export_print
+		# Ensure the validity of the input arguments
+		args.validity_barrier()
+
+		self.args = args
+		"Input arguments"
 
 		self.yolo: Optional[YOLO] = None
+		"YOLO model instance"
+
+		self.cap: Optional[cv2.VideoCapture] = None
+		"Input video capture object"
+
 		self.current_frame_bgr: Optional[ndarray] = None
+		"Last frame read, in BGR format"
+
 		self.current_results: Optional[Any] = None
+		"Last pose fitting results"
+
+		self.fps: Optional[float] = None
+		"Input (and output) video fps"
+
+		self.frame_size: Optional[Tuple[int, int]] = None
+		"Input (and output) video size (width, height)"
+
+		self.frame_count: Optional[int] = None
+		"Input video frame count"
 
 	def __enter__(self) -> 'PoseFitter':
 
+		print("Loading input video...")
+
 		# Open video file
-		cap = cv2.VideoCapture(self.input_filepath)
+		cap = cv2.VideoCapture(self.args.input_video)
 
 		# Test if the video file is opened successfully
 		if not cap.isOpened():
-			raise FileNotFoundError(f"Could not open video file at path: {self.input_filepath}")
+			raise FileNotFoundError(f"Could not open video file at path: {self.args.input_video}")
 
 		self.cap = cap
 
@@ -43,7 +61,11 @@ class PoseFitter(ClipCommons):
 		self.frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 		self.fps = cap.get(cv2.CAP_PROP_FPS)
 
-		self.yolo = YOLO('res/yolov8x-pose.pt')
+		print("Loading YOLO model...")
+
+		self.yolo = YOLO('res/yolov8s-pose.pt')
+
+		print("Done.")
 
 		return self
 
@@ -56,7 +78,11 @@ class PoseFitter(ClipCommons):
 
 		return
 
-	def do_next(self) -> bool:
+	def fit_next(self) -> bool:
+		"""
+		Tries to read the next frame from the video and fit the pose.
+		:return: Whether the frame was successfully read and fitted.
+		"""
 
 		# Read frame from video
 		ret, frame = self.cap.read()
@@ -67,7 +93,7 @@ class PoseFitter(ClipCommons):
 			self.current_results = None
 			return False
 
-		# Assign frames
+		# Assign frame
 		self.current_frame_bgr = frame
 
 		# Fit pose
@@ -75,44 +101,67 @@ class PoseFitter(ClipCommons):
 
 		return True
 
-	def draw(self) -> ndarray:
+	def export_preview_frame(self, vid_writer: cv2.VideoWriter) -> None:
+		"""
+		Exports the current frame results to the output preview video.
+		:param vid_writer: Video writer object
+		"""
 
-		# Visualize the results on the frame
+		# Draw the pose on the frame
 		annotated_frame = self.current_results[0].plot()
 
-		return annotated_frame
+		# Write the frame into the output video
+		vid_writer.write(annotated_frame)
 
-	def export(self, debug: bool = False) -> None:
+	def export_results_frame(self, df: pd.DataFrame) -> None:
 		"""
-		Exports a clip from the opened video to another file.
+		Exports the current frame results to the output CSV file.
+		:param df: DataFrame object
 		"""
 
-		# Initialize the video writer
-		out_filepath = f"{self.savedir}/{self.name}-posed.mp4"
-		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
+		pass
 
-		print(f"Processing {out_filepath}")
+	def fit_and_export(self) -> None:
+		"""
+		Performs the export action(s) based on the input arguments.
+		If export_preview is set, it will save a video with the pose fitting.
+		If export_results is set, it will save a CSV file with the pose fitting results.
+		"""
+
+		# Variables initialization
+		filepath_results: str = ''
+		vid_writer: Optional[cv2.VideoWriter] = None
+		df: Optional[pd.DataFrame] = None
+
+		# Initialize preview export
+		if self.args.export_preview:
+			filepath_preview = f"{self.args.save_dir}/fit-{self.args.name}.mp4"
+			vid_writer = cv2.VideoWriter(filepath_preview, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
+
+		# Initialize results export
+		if self.args.export_results:
+			filepath_results = f"{self.args.save_dir}/fit-{self.args.name}.csv"
+			df = pd.DataFrame(columns=['frame', 'blue', 'white'])
+			df.to_csv(filepath_results, index=False)  # Verify the file can be written
+
+		print(f"Processing {self.args.name}")
 
 		# Read and write the frames to the output video file
-		while True:
+		while self.fit_next():
 
-			if not self.do_next():
-				break
+			if self.args.export_preview:
+				self.export_preview_frame(vid_writer)
 
-			drawn_frame = self.draw()
-
-			if debug:
-				cv2.imshow('PoseFitter Debug', drawn_frame)
-				if cv2.waitKey(10) & 0xFF == ord('q'):
-					break
-
-			out.write(self.draw())
+			if self.args.export_results:
+				self.export_results_frame(df)
 
 		# Release the video writer
-		out.release()
+		if self.args.export_preview:
+			vid_writer.release()
 
-		if debug:
-			cv2.destroyAllWindows()
+		# Release the CSV file
+		if self.args.export_results:
+			df.to_csv(filepath_results, index=False)
 
 		return
 
