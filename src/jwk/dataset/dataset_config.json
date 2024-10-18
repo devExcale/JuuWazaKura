@@ -1,0 +1,53 @@
+{
+	"columns": [
+		"competition",
+		"ts_start",
+		"ts_end",
+		"throw",
+		"tori"
+	],
+	"stats_columns": [
+		"competition",
+		"throw",
+		"tori"
+	],
+	"throws_known": [
+		"ashi guruma",
+		"de ashi barai",
+		"eri seoi nage",
+		"harai goshi",
+		"hiza guruma",
+		"ippon seoi nage",
+		"kata guruma",
+		"ko soto gake",
+		"ko soto gari",
+		"ko uchi barai",
+		"ko uchi gake",
+		"ko uchi gari",
+		"ko uchi makikomi",
+		"morote seoi nage",
+		"o goshi",
+		"o soto gake",
+		"o soto gari",
+		"o uchi gake",
+		"o uchi gari",
+		"okuri ashi barai",
+		"sasae tsurikomi ashi",
+		"sawari seoi nage",
+		"sode tsurikomi goshi",
+		"soto makikomi",
+		"sumi gaeshi",
+		"tai otoshi",
+		"tani otoshi",
+		"tomoe nage",
+		"tsuri goshi",
+		"uchi mata",
+		"ura nage",
+		"utsuri goshi",
+		"yoko otoshi",
+		"yoko tomoe nage"
+	],
+	"throws_aliases": {
+		"sawari seoi": "sawari seoi nage"
+	}
+}
