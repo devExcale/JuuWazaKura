@@ -1,8 +1,8 @@
-competition,ts_start,ts_end,throw,tori 
-LIS2104D1T3,3:29,3:33,eri seoi nage,blue 
+competition,ts_start,ts_end,throw,tori
+LIS2104D1T3,3:29,3:33,eri seoi nage,blue
 LIS2104D1T3,5:08,5:10,kata guruma,white
 LIS2104D1T3,15:13,15:15,sasae tsurikomi ashi,blue
-LIS2104D1T3,18:47,18:49,soto makikomi,bianca
+LIS2104D1T3,18:47,18:49,soto makikomi,white
 LIS2104D1T3,19:02,19:04,eri seoi nage,blue
 LIS2104D1T3,19:35,19:36,de ashi barai,white
 LIS2104D1T3,21:07,21:08,de ashi barai,white
@@ -11,7 +11,7 @@ LIS2104D1T3,24:35,24:26,eri seoi nage,white
 LIS2104D1T3,25.46,25:49,kata guruma,white
 LIS2104D1T3,26:13,26:15,sumi gaeshi,white
 LIS2104D1T3,26:46,26:48,kata guruma,white
-LIS2104D1T3,27:33,27:35,yoko otoshi,white 
+LIS2104D1T3,27:33,27:35,yoko otoshi,white
 LIS2104D1T3,28:32,28:34,tomoe nage,blue
 LIS2104D1T3,31:20,31:22,kata guruma,blue
 LIS2104D1T3,34:45,34:47,sode tsurikomi goshi,white
@@ -32,7 +32,7 @@ LIS2104D1T3,48:36,48:40,uchi mata,white
 LIS2104D1T3,49:37,49:39,sumi gaeshi,white
 LIS2104D1T3,50:12,50:14,tai otoshi,white
 LIS2104D1T3,50:27,50:29,ashi guruma,blue
-LIS2104D1T3,52:46,52:50,osoto gari,white
+LIS2104D1T3,52:46,52:50,o soto gari,white
 LIS2104D1T3,57:38,57:40,tai otoshi,white
 LIS2104D1T3,57:59,58:02,tai otoshi,blue
 LIS2104D1T3,59:10,59:14,soto makikomi,blue
@@ -62,7 +62,7 @@ LIS2104D1T3,1:58:42,1:58:56,ashi guruma,white
 LIS2104D1T3,1:59:12,1:59:15,tomoe nage,white
 LIS2104D1T3,1:59:42,1:59:45,morote seoi nage,blue
 LIS2104D1T3,2:01:26,2:01:30,tomoe nage,white
-LIS2104D1T3,2:03:05,2:03:08,morote soei nage,blue
+LIS2104D1T3,2:03:05,2:03:08,morote seoi nage,blue
 LIS2104D1T3,2:04:30,2:04:32,o soto gari,white
 LIS2104D1T3,2:05:17,2:05:20,o soto gari,white
 LIS2104D1T3,2:05:50,2:05:53,o soto gari,white
@@ -86,7 +86,7 @@ LIS2104D1T3,2:56:45,2:56:47,ko uchi makikomi,blue
 LIS2104D1T3,3:00:20,3:00:25,soto makikomi,blue
 LIS2104D1T3,3:05:38,3:05:40,ura nage,white
 LIS2104D1T3,3:06:43,3:06:46,ippon seoi nage,blue
-LIS2104D1T3,3:16:33,3:16:35,sode tsurikomi,blue
+LIS2104D1T3,3:16:33,3:16:35,sode tsurikomi goshi,blue
 LIS2104D1T3,3:18:36,3:18:38,ippon seoi nage,blue
 LIS2104D1T3,3:21:25,3:21:28,morote seoi nage,blue
 LIS2104D1T3,3:23:02,3:23:04,harai goshi,white
