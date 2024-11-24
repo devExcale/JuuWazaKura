@@ -1,0 +1,5 @@
+mediapipe==0.10.11
+pandas==2.2.1
+requests==2.32.0
+ultralytics==8.1.45
+yt-dlp==2024.11.18
