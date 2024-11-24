@@ -29,6 +29,7 @@
 		"o goshi",
 		"o soto gake",
 		"o soto gari",
+		"o soto guruma",
 		"o uchi gake",
 		"o uchi gari",
 		"okuri ashi barai",
@@ -49,5 +50,21 @@
 	],
 	"throws_aliases": {
 		"sawari seoi": "sawari seoi nage"
+	},
+	"throws_groups": {
+		"seoi nage": [
+			"eri seoi nage",
+			"ippon seoi nage",
+			"sawari seoi nage"
+		],
+		"ashi barai": [
+			"de ashi barai",
+			"okuri ashi barai"
+		],
+		"o soto gake": [
+			"o soto gake",
+			"o soto gari",
+			"o soto guruma"
+		]
 	}
 }
