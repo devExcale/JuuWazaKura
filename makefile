@@ -27,3 +27,9 @@ posefitter:
 	for vid in target/$(code)/*.mp4; do \
 		python -m jwk.posefitter -p -i $$vid -o target/$(code)-posed; \
 	done
+
+ds-download:
+	python -m jwk.dataset download
+
+ds-stats:
+	python -m jwk.dataset stats

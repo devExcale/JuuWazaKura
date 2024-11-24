@@ -8,6 +8,7 @@ poetry.lock
 # Video files
 *.webm
 *.mp4
+*.part
 
 # Model files
 *.pt
