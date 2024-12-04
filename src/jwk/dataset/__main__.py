@@ -4,7 +4,7 @@ import logging
 import os
 
 from .ds_handler import DatasetHandler
-from .ds_downloader import download_dataset
+from .ds_downloader import DatasetDownloader
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument(
@@ -38,7 +38,8 @@ def main_stats(dir_dataset: str):
 
 
 def main_download(dir_dataset: str):
-	download_dataset(dir_dataset)
+	with DatasetDownloader(dir_dataset) as downloader:
+		downloader.main_dwnl_clip_async()
 
 
 def main():
