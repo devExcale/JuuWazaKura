@@ -3,3 +3,5 @@ pandas==2.2.1
 requests==2.32.0
 ultralytics==8.1.45
 yt-dlp==2024.11.18
+opencv-python~=4.10.0.84
+numpy~=1.26.4

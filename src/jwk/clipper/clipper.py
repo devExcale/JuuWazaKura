@@ -1,3 +1,5 @@
+import logging
+import os
 from typing import Union, Tuple, Optional
 
 import cv2
@@ -5,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from jwk.clipcommons import ClipCommons
+
+log = logging.getLogger(__name__)
 
 
 class Clipper(ClipCommons):
@@ -17,9 +21,10 @@ class Clipper(ClipCommons):
 		Initializes the Clipper object with the video file path.
 		"""
 		self.input_filepath = input_filepath
-		self.savedir = savedir
+		self.root_dir = savedir
 		self.name = name
 		self.output_size = size
+		self.output_dir = os.path.join(self.root_dir, self.name)
 
 		return
 
@@ -49,7 +54,13 @@ class Clipper(ClipCommons):
 			elif w is not None:
 				self.output_size = (w, int(w * self.frame_size[1] / self.frame_size[0]))
 
-		print(f"Output size: {self.output_size}")
+		log.debug(f"Output size: {self.output_size}")
+
+		# Create the output directory
+		if not os.path.exists(self.output_dir):
+			os.makedirs(self.output_dir)
+
+		log.debug(f"Output directory: {self.output_dir}")
 
 		return self
 
@@ -75,11 +86,21 @@ class Clipper(ClipCommons):
 
 		# Check if the start and end frames are within the video length
 		if start < 0 or end < 0 or start >= self.frame_count or end >= self.frame_count:
-			raise ValueError("Start and end frames must be within the video length")
+			raise ValueError(f"Start and end frames must be within the video length: {self.name}/{start}-{end}")
 
 		# Check if start/end are in the correct order
 		if start > end:
-			raise ValueError("Start frame must be before the end frame")
+			raise ValueError(f"Start frame must be before the end frame: {self.name}/{start}-{end}")
+
+		clip_name = f"{self.name}-{start}.mp4"
+		clip_path = os.path.join(self.output_dir, clip_name)
+
+		# Check if clip was already exported
+		if os.path.exists(clip_path):
+			log.debug(f"Clip {clip_name} already exists")
+			return
+		else:
+			log.debug(f"Exporting {clip_name}")
 
 		if sim:
 			return
@@ -88,11 +109,8 @@ class Clipper(ClipCommons):
 		self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
 
 		# Initialize the video writer
-		out_filepath = f"{self.savedir}/{self.name}-{start}-{end}.mp4"
 		out_frame_size = self.output_size or self.frame_size
-		out = cv2.VideoWriter(out_filepath, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
-
-		print(f"Exporting {start}-{end} to {out_filepath}")
+		writer = cv2.VideoWriter(clip_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
 
 		# Read and write the frames to the output video file
 		for i in range(start, end + 1):
@@ -108,10 +126,10 @@ class Clipper(ClipCommons):
 			if self.output_size is not None:
 				frame = cv2.resize(frame, self.output_size)
 
-			out.write(frame)
+			writer.write(frame)
 
 		# Release the video writer
-		out.release()
+		writer.release()
 
 		return
 

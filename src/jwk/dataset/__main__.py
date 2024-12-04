@@ -43,7 +43,7 @@ def main_download(dir_dataset: str):
 
 def main():
 
-	logging.basicConfig(level=logging.INFO)
+	logging.basicConfig(level=logging.DEBUG)
 
 	cwd = os.getcwd()
 	dir_dataset = os.path.join(cwd, 'dataset')

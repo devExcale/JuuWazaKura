@@ -1,11 +1,8 @@
 {
 	"fileFormat": 136,
-	"vidIds": {
+	"ignore": {
 		"LIS2104D1T1": "V9inDFPYcAY",
 		"LIS2104D1T2": "HuVj8Qqowxk",
-		"LIS2104D1T3": "Brd5FDUlK3w",
-		"LIS2104D2T1": "qPPrk21hAo8",
-		"LIS2104D2T2": "PAW0MtyJIGA",
 		"LIS2104D2T3": "tyfIHnI__k8",
 		"LIS2104D3T1": "eGKjUZKkcAE",
 		"LIS2104D3T2": "jn_3lD39mUI",
@@ -20,6 +17,11 @@
 		"SAR2210D1T1FIN": "7zREG7vMDgc",
 		"SAR2210D1T2FIN": "ljIkkH-Jb4Y",
 		"SAR2210D2T1FIN": "ozvTsftwfGg",
-		"SAR2210D2T2FIN": "hdYeKvyQaqw"
+		"SAR2210D2T2FIN": "hdYeKvyQaqw",
+		"LIS2104D2T2": "PAW0MtyJIGA"
+	},
+	"vidIds": {
+		"LIS2104D2T1": "qPPrk21hAo8",
+		"LIS2104D1T3": "Brd5FDUlK3w"
 	}
 }

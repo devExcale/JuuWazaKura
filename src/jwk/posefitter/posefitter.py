@@ -63,7 +63,7 @@ class PoseFitter(ClipCommons):
 
 		print("Loading YOLO model...")
 
-		self.yolo = YOLO('res/yolov8s-pose.pt')
+		self.yolo = YOLO('res/yolov8s-seg.pt')
 
 		print("Done.")
 
@@ -135,12 +135,12 @@ class PoseFitter(ClipCommons):
 
 		# Initialize preview export
 		if self.args.export_preview:
-			filepath_preview = f"{self.args.save_dir}/fit-{self.args.name}.mp4"
+			filepath_preview = f"{self.args.save_dir}/fitseg-{self.args.name}.mp4"
 			vid_writer = cv2.VideoWriter(filepath_preview, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
 
 		# Initialize results export
 		if self.args.export_results:
-			filepath_results = f"{self.args.save_dir}/fit-{self.args.name}.csv"
+			filepath_results = f"{self.args.save_dir}/fitseg-{self.args.name}.csv"
 			df = pd.DataFrame(columns=['frame', 'blue', 'white'])
 			df.to_csv(filepath_results, index=False)  # Verify the file can be written
 
