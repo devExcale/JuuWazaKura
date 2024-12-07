@@ -4,6 +4,7 @@ export PYTHONPATH=$$PYTHONPATH:src
 width_clause = $(if $(width),-w $(width),)
 vid_ext ?= mp4
 
+# Show application environment variables (w/defaults)
 env:
 	python -m jwk.commons env
 
@@ -31,8 +32,10 @@ posefitter:
 		python -m jwk.posefitter -p -i $$vid -o target/$(code)-posed; \
 	done
 
+# Download the entire dataset (mp4 clips)
 ds-download:
 	python -m jwk.dataset download
 
+# Perform analysis on the dataset (csv)
 ds-stats:
 	python -m jwk.dataset stats
