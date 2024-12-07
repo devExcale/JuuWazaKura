@@ -4,6 +4,9 @@ export PYTHONPATH=$$PYTHONPATH:src
 width_clause = $(if $(width),-w $(width),)
 vid_ext ?= mp4
 
+env:
+	python -m jwk.commons env
+
 # Run the clipper module main function
 clipper:
 	@if [ -z "$(code)" ]; then \

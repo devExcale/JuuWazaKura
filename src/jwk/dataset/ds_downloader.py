@@ -7,6 +7,7 @@ from typing import Dict, Optional
 
 from yt_dlp import YoutubeDL
 
+from ..commons import MyEnv
 from ..clipper import Clipper
 
 log = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ class DatasetDownloader:
 			'outtmpl': os.path.join(self.dir_clips, f'{name}.%(ext)s'),
 			'format': self.yt_format,
 			'quiet': True,
-			'concurrent_fragment_downloads': 12,  # TODO: environment
+			'concurrent_fragment_downloads': MyEnv.concurrent_downloads,
 		}
 
 		# Download the file
@@ -176,7 +177,7 @@ class DatasetDownloader:
 		producer.start()
 
 		# Start the consumers
-		n_consumers = 4  # TODO: environment
+		n_consumers = MyEnv.concurrent_clippers
 		consumers = []
 		for _ in range(n_consumers):
 			consumer = threading.Thread(target=self.__clip_consumer__)
