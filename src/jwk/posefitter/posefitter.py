@@ -5,7 +5,7 @@ from numpy import ndarray
 from ultralytics import YOLO
 import pandas as pd
 
-from ..clipcommons import ClipCommons
+from ..commons import ClipCommons
 from .arguments import PoseFitterArguments
 
 

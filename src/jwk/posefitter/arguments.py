@@ -2,7 +2,7 @@ import argparse
 import json
 from typing import Optional
 
-from ..utils import extract_filename
+from ..commons import filename_from_path
 
 parser = argparse.ArgumentParser(
 	description='Fit a skeleton to two judo athletes in a video file.'
@@ -86,7 +86,7 @@ class PoseFitterArguments:
 
 		# Set default output name
 		if self.name is None and self.input_video is not None:
-			self.name = extract_filename(self.input_video)
+			self.name = filename_from_path(self.input_video)
 
 	def from_parser(self) -> 'PoseFitterArguments':
 		"""

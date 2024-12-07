@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from jwk.clipcommons import ClipCommons
+from ..commons import ClipCommons
 
 log = logging.getLogger(__name__)
 
