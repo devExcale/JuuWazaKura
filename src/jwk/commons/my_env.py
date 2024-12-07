@@ -9,7 +9,9 @@ log = logging.getLogger(__name__)
 
 class MyEnv:
 	"""
-
+	Class to manage the environment variables.
+	Tries to load the class variables from the system environment.
+	Class variables are recognized as such if they are annotated by their type.
 	"""
 
 	concurrent_downloads: int = 8
@@ -43,9 +45,22 @@ class MyEnv:
 		return keys
 
 	@classmethod
-	def apply_dotenv(cls) -> None:
+	def values(cls) -> Dict[str, Any]:
+		"""
+		Get the values of the class variables.
 		"""
 
+		items = {
+			key: getattr(cls, key)
+			for key in cls.get_keys()
+		}
+
+		return items
+
+	@classmethod
+	def apply_dotenv(cls) -> None:
+		"""
+		Load the .env file into the environment and set the class variables.
 		"""
 
 		load_dotenv()
@@ -68,19 +83,6 @@ class MyEnv:
 					continue
 
 				setattr(cls, key, cast(value))
-
-	@classmethod
-	def values(cls) -> Dict[str, Any]:
-		"""
-
-		"""
-
-		items = {
-			key: getattr(cls, key)
-			for key in cls.get_keys()
-		}
-
-		return items
 
 
 MyEnv.apply_dotenv()
