@@ -13,7 +13,7 @@ def main_env():
 	import json
 
 	items = {
-		k: str(v)
+		k: v
 		for k, v in MyEnv.values().items()
 	}
 

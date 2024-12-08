@@ -58,7 +58,11 @@ class DatasetDownloader:
 
 		# Get dataset parameters
 		self.yt_format = str(ds['fileFormat'])
-		self.yt_ids = ds['vidIds']
+		self.yt_ids = {
+			k: v
+			for k, v in ds['vidIds'].items()
+			if not MyEnv.dataset_include or k in MyEnv.dataset_include
+		}
 
 		return self
 

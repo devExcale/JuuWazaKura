@@ -1,5 +1,6 @@
 import logging
 import os.path
+import typing
 from typing import Dict, Any, List
 
 from dotenv import load_dotenv
@@ -25,6 +26,9 @@ class MyEnv:
 
 	dataset_clips: str = os.path.join(os.getcwd(), 'dataset', 'clips')
 	"""Path to the folder containing the video clips."""
+
+	dataset_include: List[str] = []
+	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 
 	delete_yt: bool = True
 	"""Whether to delete the original dataset videos after clipping."""
@@ -70,6 +74,10 @@ class MyEnv:
 			# Get annotated type for the variable
 			cast = cls.__annotations__.get(key, str)
 
+			# Custom converters
+			if list in (cast, typing.get_origin(cast)):
+				cast = lambda x: list(filter(len, str(x).split(',')))
+
 			# Get the value from the environment
 			value = os.getenv(key)
 
@@ -82,7 +90,7 @@ class MyEnv:
 					log.error(f'Could not cast \'{key}={value}\' to {cast}: {e}')
 					continue
 
-				setattr(cls, key, cast(value))
+				setattr(cls, key, value)
 
 
 MyEnv.apply_dotenv()
