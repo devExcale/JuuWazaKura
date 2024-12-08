@@ -16,22 +16,22 @@ class MyEnv:
 	"""
 
 	concurrent_downloads: int = 8
-	"""How many fragments to download concurrently, a yt-dlp parameter."""
+	""" How many fragments to download concurrently, a yt-dlp parameter. """
 
 	concurrent_clippers: int = 4
-	"""How many videos to clip concurrently."""
+	""" How many videos to clip concurrently. """
 
 	dataset_source: str = os.path.join(os.getcwd(), 'dataset')
-	"""Path to the folder containing the csv files."""
+	""" Path to the folder containing the csv files. """
 
 	dataset_clips: str = os.path.join(os.getcwd(), 'dataset', 'clips')
-	"""Path to the folder containing the video clips."""
+	""" Path to the folder containing the video clips. """
 
 	dataset_include: List[str] = []
 	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 
 	delete_yt: bool = True
-	"""Whether to delete the original dataset videos after clipping."""
+	""" Whether to delete the original dataset videos after clipping. """
 
 	@classmethod
 	def get_keys(cls) -> List[str]:
