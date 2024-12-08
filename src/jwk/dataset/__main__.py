@@ -14,7 +14,7 @@ parser.add_argument(
 )
 
 
-def main_stats(dir_dataset: str):
+def main_stats():
 	handler = DatasetHandler()
 	handler.config()
 
@@ -37,8 +37,8 @@ def main_stats(dir_dataset: str):
 	print('Unknown throws:', unknown_throws)
 
 
-def main_download(dir_dataset: str):
-	with DatasetDownloader(dir_dataset) as downloader:
+def main_download():
+	with DatasetDownloader() as downloader:
 		downloader.main_dwnl_clip_async()
 
 
@@ -46,15 +46,15 @@ def main():
 
 	logging.basicConfig(level=logging.DEBUG)
 
-	cwd = os.getcwd()
-	dir_dataset = os.path.join(cwd, 'dataset')
-
 	args = parser.parse_args()
 
-	if args.action == 'stats':
-		main_stats(dir_dataset)
-	elif args.action == 'download':
-		main_download(dir_dataset)
+	switch = {
+		'stats': main_stats,
+		'download': main_download
+	}
+
+	main_method = switch.get(args.action, parser.print_help)
+	main_method()
 
 
 if __name__ == '__main__':
