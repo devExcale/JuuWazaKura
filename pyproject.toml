@@ -7,7 +7,7 @@ readme = "README.md"
 packages = [{ include = "juwazaku", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 mediapipe = "^0.10.11"
 pandas = "^2.2.1"
 requests = "^2.31.0"

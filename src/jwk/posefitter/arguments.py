@@ -2,7 +2,7 @@ import argparse
 import json
 from typing import Optional
 
-from ..commons import filename_from_path
+from ..utils import filename_from_path
 
 parser = argparse.ArgumentParser(
 	description='Fit a skeleton to two judo athletes in a video file.'

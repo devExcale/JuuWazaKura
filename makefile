@@ -5,8 +5,8 @@ width_clause = $(if $(width),-w $(width),)
 vid_ext ?= mp4
 
 # Show application environment variables (w/defaults)
-env:
-	python -m jwk.commons env
+printenv:
+	python -m jwk.utils printenv
 
 # Run the clipper module main function
 clipper:
@@ -39,3 +39,7 @@ ds-download:
 # Perform analysis on the dataset (csv)
 ds-stats:
 	python -m jwk.dataset stats
+
+# List the optimal video formats (given dataset parameters) for download for each video
+ds-ytformats:
+	python -m jwk.dataset ytformats

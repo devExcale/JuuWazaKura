@@ -1,8 +1,13 @@
 import json
+import logging
 import os
-from typing import Optional, Dict, List, Set
+from typing import Optional, Dict, Set
 
 import pandas as pd
+
+from ..utils import MyEnv, get_logger
+
+log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 
 class DatasetHandler:
@@ -29,6 +34,8 @@ class DatasetHandler:
 		"List of known throws."
 
 		self.throws_aliases: Dict[str, str] = {}
+
+		log.debug("Initialized DatasetHandler on directory: %s", self.directory)
 
 	def config(self) -> None:
 

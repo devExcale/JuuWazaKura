@@ -1,13 +1,16 @@
 {
-	"fileFormat": 136,
 	"ignore": {
+	},
+	"vidIds": {
+		"LIG2202D1T1": "pfuhgag3Rr0",
+		"LIS2104D2T1": "qPPrk21hAo8",
+		"LIS2104D1T3": "Brd5FDUlK3w",
 		"LIS2104D1T1": "V9inDFPYcAY",
 		"LIS2104D1T2": "HuVj8Qqowxk",
 		"LIS2104D2T3": "tyfIHnI__k8",
 		"LIS2104D3T1": "eGKjUZKkcAE",
 		"LIS2104D3T2": "jn_3lD39mUI",
 		"LIS2104D3T3": "u1D9DdBrvzI",
-		"LIG2202D1T1": "pfuhgag3Rr0",
 		"LIG2202D1T2": "9dxMrY7ilkE",
 		"LIG2202D1T3": "Vojpx-cfOb4",
 		"LIG2202D2T1": "t2yMpgTvoLg",
@@ -20,8 +23,10 @@
 		"SAR2210D2T2FIN": "hdYeKvyQaqw",
 		"LIS2104D2T2": "PAW0MtyJIGA"
 	},
-	"vidIds": {
-		"LIS2104D2T1": "qPPrk21hAo8",
-		"LIS2104D1T3": "Brd5FDUlK3w"
+	"format": {
+		"width": 1280,
+		"height": 720,
+		"fps": 30,
+		"ext": "mp4"
 	}
 }

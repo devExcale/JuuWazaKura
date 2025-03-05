@@ -3,14 +3,14 @@ import logging
 import os
 import queue
 import threading
-from typing import Dict, Optional
 
 from yt_dlp import YoutubeDL
 
-from ..commons import MyEnv
 from ..clipper import Clipper
+from ..utils import MyEnv, get_logger
 
-log = logging.getLogger(__name__)
+# Initialize logging
+log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 
 class DatasetDownloader:
@@ -28,10 +28,10 @@ class DatasetDownloader:
 		self.dir_clips: str = os.path.join(self.dir_dataset, 'clips')
 		""" Directory where the clips are stored """
 
-		self.yt_format: Optional[str] = None
-		""" YouTube video format code, loaded on enter """
+		self.yt_format: dict[str, int | str] = {}
+		""" YouTube video format (width, height, fps, ext), loaded on enter """
 
-		self.yt_ids: Dict[str, str] = {}
+		self.yt_video_ids: dict[str, str] = {}
 		""" YouTube video Name:IDs, loaded on enter """
 
 		self.queue = queue.Queue()
@@ -56,8 +56,8 @@ class DatasetDownloader:
 			ds = json.load(f)
 
 		# Get dataset parameters
-		self.yt_format = str(ds['fileFormat'])
-		self.yt_ids = ds['vidIds']
+		self.yt_format = ds['format']
+		self.yt_video_ids = ds['vidIds']
 
 		return self
 
@@ -88,7 +88,7 @@ class DatasetDownloader:
 		# Create the yt-dlp options
 		ydl_opts = {
 			'outtmpl': os.path.join(self.dir_clips, f'{name}.%(ext)s'),
-			'format': self.yt_format,
+			'format': self.yt_find_format(yt_id),
 			'quiet': True,
 			'concurrent_fragment_downloads': MyEnv.concurrent_downloads,
 		}
@@ -98,6 +98,35 @@ class DatasetDownloader:
 			ret = ydl.download([yt_id])
 
 		return ret == 0
+
+	def yt_find_format(self, yt_id) -> str:
+
+		# Create the yt-dlp options
+		ydl_opts = {
+			'quiet': True,
+		}
+
+		# Download video info
+		with YoutubeDL(ydl_opts) as ydl:
+			info = ydl.extract_info(yt_id, download=False)
+
+		# Get the formats
+		formats: list[dict] = info['formats']
+
+		# Filter by the desired format
+		formats = filter(
+			lambda f: all(f.get(k, None) == v for k, v in self.yt_format.items()),
+			formats
+		)
+
+		if not formats:
+			raise ValueError(f'No format found for {yt_id}')
+
+		# Get format with lowest filesize
+		fmt = min(formats, key=lambda f: f.get('filesize', float('inf')))
+
+		# Return format id
+		return fmt['format_id']
 
 	def clip_video(self, name: str) -> None:
 		"""
@@ -137,11 +166,11 @@ class DatasetDownloader:
 
 		log.debug(f'Downloading dataset to "{self.dir_clips}"')
 
-		n_vids = len(self.yt_ids)
+		n_vids = len(self.yt_video_ids)
 		downloaded = []
 
 		# Download all the files
-		for i, (name, yt_id) in enumerate(self.yt_ids.items()):
+		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
 
 			log.info(f'Downloading {i + 1}{n_vids}: {name}/{yt_id}')
 
@@ -154,7 +183,6 @@ class DatasetDownloader:
 
 		# Convert full videos to clips
 		for i, name in enumerate(downloaded):
-
 			log.info(f'Clipping {i + 1}/{n_downloaded}: {name}')
 
 			clipper = Clipper(
@@ -195,10 +223,10 @@ class DatasetDownloader:
 
 	def __yt_producer__(self):
 
-		n_vids = len(self.yt_ids)
+		n_vids = len(self.yt_video_ids)
 
 		# Download all the files
-		for i, (name, yt_id) in enumerate(self.yt_ids.items()):
+		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
 
 			log.info(f'Downloading {i + 1}{n_vids}: {name}/{yt_id}')
 

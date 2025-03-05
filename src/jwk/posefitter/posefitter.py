@@ -5,11 +5,10 @@ from numpy import ndarray
 from ultralytics import YOLO
 import pandas as pd
 
-from ..commons import ClipCommons
 from .arguments import PoseFitterArguments
 
 
-class PoseFitter(ClipCommons):
+class PoseFitter:
 
 	def __init__(
 			self,
@@ -136,6 +135,7 @@ class PoseFitter(ClipCommons):
 		# Initialize preview export
 		if self.args.export_preview:
 			filepath_preview = f"{self.args.save_dir}/fitseg-{self.args.name}.mp4"
+			# noinspection PyUnresolvedReferences
 			vid_writer = cv2.VideoWriter(filepath_preview, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, self.frame_size)
 
 		# Initialize results export

@@ -4,7 +4,9 @@ from typing import Dict, Any, List
 
 from dotenv import load_dotenv
 
-log = logging.getLogger(__name__)
+from .logging import get_logger
+
+log = get_logger(__name__, logging.ERROR)
 
 
 class MyEnv:
@@ -28,6 +30,17 @@ class MyEnv:
 
 	delete_yt: bool = True
 	"""Whether to delete the original dataset videos after clipping."""
+
+	log_levelname: str = 'INFO'
+	"""The logging level name."""
+
+	@classmethod
+	def log_level(cls) -> int:
+		"""
+		Get the logging level from the class variable.
+		"""
+
+		return getattr(logging, cls.log_levelname, logging.INFO)
 
 	@classmethod
 	def get_keys(cls) -> List[str]:

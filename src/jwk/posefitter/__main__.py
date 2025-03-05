@@ -1,7 +1,5 @@
-import argparse
-
-from .posefitter import PoseFitter
 from .arguments import PoseFitterArguments
+from .posefitter import PoseFitter
 
 
 def main():

@@ -3,14 +3,14 @@ import json
 import logging
 import os
 
-from .ds_handler import DatasetHandler
 from .ds_downloader import DatasetDownloader
+from .ds_handler import DatasetHandler
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument(
 	'action',
-	choices=['stats', 'download'],
-	help='Action to perform: stats or download'
+	choices=['stats', 'download', 'ytformats'],
+	help='Action to perform',
 )
 
 
@@ -42,8 +42,17 @@ def main_download(dir_dataset: str):
 		downloader.main_dwnl_clip_async()
 
 
-def main():
+def main_ytformats(dir_dataset: str):
+	formats: dict[str, str] = {}
 
+	with DatasetDownloader(dir_dataset) as downloader:
+		for yt_id in downloader.yt_video_ids.values():
+			formats[yt_id] = downloader.yt_find_format(yt_id)
+
+	print(json.dumps(formats, indent=4))
+
+
+def main():
 	logging.basicConfig(level=logging.DEBUG)
 
 	cwd = os.getcwd()
@@ -55,6 +64,8 @@ def main():
 		main_stats(dir_dataset)
 	elif args.action == 'download':
 		main_download(dir_dataset)
+	elif args.action == 'ytformats':
+		main_ytformats(dir_dataset)
 
 
 if __name__ == '__main__':

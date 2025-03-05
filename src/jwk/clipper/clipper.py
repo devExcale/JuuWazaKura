@@ -6,12 +6,12 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from ..commons import ClipCommons
+from ..utils import get_framestamp
 
 log = logging.getLogger(__name__)
 
 
-class Clipper(ClipCommons):
+class Clipper:
 	"""
 	Class for generating clips from a video file.
 	"""
@@ -82,7 +82,7 @@ class Clipper(ClipCommons):
 		"""
 
 		# Convert timestamps to frame numbers
-		start, end = self.__ensure_timestamps__(start, end)
+		start, end = get_framestamp(start, end, self.fps)
 
 		# Check if the start and end frames are within the video length
 		if start < 0 or end < 0 or start >= self.frame_count or end >= self.frame_count:
@@ -110,6 +110,7 @@ class Clipper(ClipCommons):
 
 		# Initialize the video writer
 		out_frame_size = self.output_size or self.frame_size
+		# noinspection PyUnresolvedReferences
 		writer = cv2.VideoWriter(clip_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
 
 		# Read and write the frames to the output video file
@@ -133,6 +134,7 @@ class Clipper(ClipCommons):
 
 		return
 
+	# noinspection PyUnresolvedReferences
 	def export_from_csv(self, csv_path: str, sim: bool = False) -> None:
 		"""
 		Exports clips from the opened video based on the timestamps in a CSV file.
@@ -159,7 +161,7 @@ class Clipper(ClipCommons):
 		"""
 		Returns the name of a clip based on the start and end frame numbers.
 		"""
-		start, end = self.__ensure_timestamps__(start, end)
+		start, end = get_framestamp(start, end, self.fps)
 		return f"{self.name}-{start}-{end}.mp4"
 
 
