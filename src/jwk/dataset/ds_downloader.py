@@ -15,21 +15,19 @@ log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 class DatasetDownloader:
 
-	def __init__(self, dir_dataset: str) -> None:
+	def __init__(self) -> None:
 		"""
 		Constructor for the DatasetDownloader class.
-
-		:param dir_dataset: Directory where the dataset is stored
 		"""
 
-		self.dir_dataset: str = dir_dataset
+		self.dir_dataset: str = MyEnv.dataset_source
 		""" Directory where the dataset is stored """
 
-		self.dir_clips: str = os.path.join(self.dir_dataset, 'clips')
+		self.dir_clips: str = MyEnv.dataset_clips
 		""" Directory where the clips are stored """
-
-		self.yt_format: dict[str, int | str] = {}
-		""" YouTube video format (width, height, fps, ext), loaded on enter """
+		
+		self.rm_clip_source: bool = MyEnv.delete_yt
+		""" Whether to remove the source video after clipping """
 
 		self.yt_video_ids: dict[str, str] = {}
 		""" YouTube video Name:IDs, loaded on enter """
@@ -56,8 +54,11 @@ class DatasetDownloader:
 			ds = json.load(f)
 
 		# Get dataset parameters
-		self.yt_format = ds['format']
-		self.yt_video_ids = ds['vidIds']
+		self.yt_ids = {
+			k: v
+			for k, v in ds['vidIds'].items()
+			if not MyEnv.dataset_include or k in MyEnv.dataset_include
+		}
 
 		return self
 
@@ -136,7 +137,7 @@ class DatasetDownloader:
 		"""
 
 		# Check whether the video exists
-		path_video = os.path.join(self.dir_dataset, 'clips', f'{name}.mp4')
+		path_video = os.path.join(self.dir_clips, f'{name}.mp4')
 		if not os.path.exists(path_video):
 			log.warning(f'Skipping {name} as the video does not exist')
 			return
@@ -144,12 +145,16 @@ class DatasetDownloader:
 		# Clip the video
 		clipper = Clipper(
 			input_filepath=path_video,
-			savedir=os.path.join(self.dir_dataset, 'clips'),
+			savedir=self.dir_clips,
 			name=name,
 		)
 
 		with clipper as c:
 			c.export_from_csv(os.path.join(self.dir_dataset, f'{name}.csv'))
+
+		# Delete file on finish
+		if self.rm_clip_source:
+			os.remove(path_video)
 
 		return
 
@@ -172,7 +177,7 @@ class DatasetDownloader:
 		# Download all the files
 		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
 
-			log.info(f'Downloading {i + 1}{n_vids}: {name}/{yt_id}')
+			log.info(f'Downloading {i + 1}/{n_vids}: {name}/{yt_id}')
 
 			if self.yt_download(name, yt_id):
 				downloaded.append(name)
@@ -183,6 +188,7 @@ class DatasetDownloader:
 
 		# Convert full videos to clips
 		for i, name in enumerate(downloaded):
+
 			log.info(f'Clipping {i + 1}/{n_downloaded}: {name}')
 
 			clipper = Clipper(
@@ -228,7 +234,7 @@ class DatasetDownloader:
 		# Download all the files
 		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
 
-			log.info(f'Downloading {i + 1}{n_vids}: {name}/{yt_id}')
+			log.info(f'Downloading {i + 1}/{n_vids}: {name}/{yt_id}')
 
 			if self.yt_download(name, yt_id):
 				self.queue.put(name)

@@ -1,5 +1,6 @@
 import logging
 import os.path
+import typing
 from typing import Dict, Any, List
 
 from dotenv import load_dotenv
@@ -17,19 +18,22 @@ class MyEnv:
 	"""
 
 	concurrent_downloads: int = 8
-	"""How many fragments to download concurrently, a yt-dlp parameter."""
+	""" How many fragments to download concurrently, a yt-dlp parameter. """
 
 	concurrent_clippers: int = 4
-	"""How many videos to clip concurrently."""
+	""" How many videos to clip concurrently. """
 
 	dataset_source: str = os.path.join(os.getcwd(), 'dataset')
-	"""Path to the folder containing the csv files."""
+	""" Path to the folder containing the csv files. """
 
 	dataset_clips: str = os.path.join(os.getcwd(), 'dataset', 'clips')
-	"""Path to the folder containing the video clips."""
+	""" Path to the folder containing the video clips. """
+
+	dataset_include: List[str] = []
+	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 
 	delete_yt: bool = True
-	"""Whether to delete the original dataset videos after clipping."""
+	""" Whether to delete the original dataset videos after clipping. """
 
 	log_levelname: str = 'INFO'
 	"""The logging level name."""
@@ -83,6 +87,10 @@ class MyEnv:
 			# Get annotated type for the variable
 			cast = cls.__annotations__.get(key, str)
 
+			# Custom converters
+			if list in (cast, typing.get_origin(cast)):
+				cast = lambda x: list(filter(len, str(x).split(',')))
+
 			# Get the value from the environment
 			value = os.getenv(key)
 
@@ -95,7 +103,7 @@ class MyEnv:
 					log.error(f'Could not cast \'{key}={value}\' to {cast}: {e}')
 					continue
 
-				setattr(cls, key, cast(value))
+				setattr(cls, key, value)
 
 
 MyEnv.apply_dotenv()

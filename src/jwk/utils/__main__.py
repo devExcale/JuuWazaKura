@@ -19,7 +19,7 @@ def main_printenv() -> None:
 	"""
 
 	items = {
-		k: str(v)
+		k: v
 		for k, v in MyEnv.values().items()
 	}
 
