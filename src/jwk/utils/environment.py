@@ -9,6 +9,9 @@ from .logging import get_logger
 
 log = get_logger(__name__, logging.ERROR)
 
+true_values = ['true', '1', 'yes']
+false_values = ['false', '0', 'no']
+
 
 class MyEnv:
 	"""
@@ -36,7 +39,7 @@ class MyEnv:
 	""" Whether to delete the original dataset videos after clipping. """
 
 	log_levelname: str = 'INFO'
-	"""The logging level name."""
+	""" The logging level name. """
 
 	@classmethod
 	def log_level(cls) -> int:
@@ -85,9 +88,12 @@ class MyEnv:
 		for key in cls.get_keys():
 
 			# Get annotated type for the variable
-			cast = cls.__annotations__.get(key, str)
+			clazz = cls.__annotations__.get(key, str)
+			cast = clazz
 
 			# Custom converters
+			if bool is cast:
+				cast = str_to_bool
 			if list in (cast, typing.get_origin(cast)):
 				cast = lambda x: list(filter(len, str(x).split(',')))
 
@@ -100,10 +106,26 @@ class MyEnv:
 				try:
 					value = cast(value)
 				except ValueError as e:
-					log.error(f'Could not cast \'{key}={value}\' to {cast}: {e}')
+					log.error(f'Could not cast \'{key}={value}\' to {clazz}: {e}')
 					continue
 
 				setattr(cls, key, value)
+
+
+def str_to_bool(val: str) -> bool:
+	"""
+	Convert a string to a boolean, case insensitive.
+
+	:param val: The string to convert
+	:return: The boolean value
+	"""
+
+	if val.lower() in true_values:
+		return True
+	elif val.lower() in false_values:
+		return False
+
+	raise ValueError(f'Cannot convert \'{val}\' to bool')
 
 
 MyEnv.apply_dotenv()
