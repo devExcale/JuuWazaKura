@@ -1,11 +1,12 @@
 import json
 import logging
 import os
+from re import match
 from typing import Optional, Dict, Set
 
 import pandas as pd
 
-from ..utils import MyEnv, get_logger
+from ..utils import MyEnv, get_logger, regex_ts, ts_to_sec
 
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
@@ -100,6 +101,39 @@ class DatasetHandler:
 
 		return
 
+	def validate_data(self) -> None:
+		"""
+		Checks whether all the loaded data is valid.
+
+		:raise ValueError: If the data is not valid.
+		:return: `None`
+		"""
+
+		# Loop over rows
+		for index, row in self.df.iterrows():
+
+			# Get fields
+			name = row['competition']
+			ts_start = row['ts_start']
+			ts_end = row['ts_end']
+
+			# Verbose row identifier
+			row_id = f"Competition={name} | Start={ts_start} | End={ts_end}"
+
+			# Check invalid timestamps formats
+			if not match(regex_ts, ts_start) or not match(regex_ts, ts_end):
+				raise ValueError(f"Invalid timestamps: {row_id}")
+
+			# Check invalid timestamps order
+			start = ts_to_sec(ts_start)
+			end = ts_to_sec(ts_end)
+			if start >= end:
+				raise ValueError(f"Invalid timestamps order: {row_id}")
+
+			# TODO: integrate tori and throw
+
+		return
+
 	def clean_data(self):
 		"""
 		Cleans the data in the DataFrame.
@@ -148,59 +182,6 @@ class DatasetHandler:
 		}
 
 		return stats
-
-	def should_download_video(self, name: str) -> bool:
-		"""
-		Check whether a video should be downloaded.
-		A video should be downloaded if there exists a corresponding csv file, the video does not exist
-		and all video segments don't exist.
-
-		:param name: Filename of the video (no extension)
-		:return: Whether the video should be downloaded
-		"""
-
-		# Check whether a corresponding csv exists
-		path_csv = os.path.join(self.dir_dataset, f'{name}.csv')
-		if not os.path.exists(path_csv):
-			return False
-
-		# Check whether the video already exists
-		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
-		if os.path.exists(path_video):
-			return False
-
-		# Check whether the segments directory exists
-		if not os.path.exists(os.path.join(self.dir_segments, name)):
-			return True
-
-		# Load dataset with csv file
-		ds_handler = DatasetHandler()
-		ds_handler.load(path_csv)
-
-		# Get all the throws start frames
-		ds_start_ms = set(map(lambda t: int(ts_to_sec(t) * 1000), ds_handler.df['ts_start']))
-
-		regex_segment_filename = rf'^{name}-(\d)+\.mp4$'
-
-		# Look for video segments on filepath
-		os_start_ms = set(
-			map(
-				# Extract the milliseconds from the filename
-				lambda m: int(m.group(1)),
-				filter(
-					# Look for matches
-					lambda m: m is not None,
-					map(
-						# Map filenames to regex match objects
-						lambda filename: match(regex_segment_filename, filename),
-						os.listdir(os.path.join(self.dir_segments, name))
-					)
-				)
-			)
-		)
-
-		# If there are missing segments, download the video
-		return bool(ds_start_ms - os_start_ms)
 
 
 def std_throw_name(name: str) -> str:

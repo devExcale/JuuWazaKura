@@ -1,9 +1,9 @@
 import argparse
 import json
 
-from jwk.utils import MyEnv
 from .ds_downloader import DatasetDownloader
 from .ds_handler import DatasetHandler
+from ..utils import MyEnv
 
 parser = argparse.ArgumentParser(description='Dataset')
 parser.add_argument(

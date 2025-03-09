@@ -1,7 +1,9 @@
 import os
 from re import match
 
-from jwk.utils import ts_to_sec
+from ..utils import ts_to_sec
+
+from .ds_handler import DatasetHandler
 
 
 class DatasetInstance:
@@ -55,6 +57,9 @@ class DatasetInstance:
 				)
 			)
 
+		self.ds_handler: DatasetHandler | None = None
+		""" DatasetHandler instance for the dataset. """
+
 		return
 
 	def is_csv_present(self) -> bool:
@@ -84,27 +89,44 @@ class DatasetInstance:
 
 		return os.path.exists(self.dir_competition)
 
-	def handler_diff(self) -> set[int]:
+	def validate_dataset(self) -> None:
 		"""
-		Returns a set with the segments that are present in the dataset but not in the segments directory.
+		Validates the dataset instance.
+
+		:raise FileNotFoundError: If the CSV file is not found.
+		:raise ValueError: If the dataset data is not valid.
+		:return: `None`
+		"""
+
+		if not self.is_csv_present():
+			raise FileNotFoundError(f"CSV file not found: {self.path_csv}")
+
+		if self.ds_handler is None:
+			self.ds_handler = DatasetHandler()
+			self.ds_handler.load(self.path_csv)
+
+		self.ds_handler.validate_data()
+
+		return
+
+	def missing_segments(self) -> set[int]:
+		"""
+		Returns a set with the segments that are found in the dataset but not in the segments directory.
 		The set contents are the milliseconds of the start of the segments.
 
-		:raise FileNotFoundError: If the CSV file is not present.
+		:raise FileNotFoundError: If the CSV file is not found.
+		:raise ValueError: If the dataset data is not valid.
 		:return: Set with the missing segments.
 		"""
 
 		if not self.is_csv_present():
 			raise FileNotFoundError(f"CSV file not found: {self.path_csv}")
 
-		# Import here to avoid circular imports
-		from .ds_handler import DatasetHandler
-
-		# Load dataset with csv file
-		handler = DatasetHandler()
-		handler.load(self.path_csv)
+		# Ensure dataset is loaded and valid
+		self.validate_dataset()
 
 		# Get all the throws start frames
-		ds_segments = set(map(lambda t: int(ts_to_sec(t) * 1000), handler.df['ts_start']))
+		ds_segments = set(map(lambda t: int(ts_to_sec(t) * 1000), self.ds_handler.df['ts_start']))
 
 		# Return the difference between the dataset and the detected segments
 		return ds_segments - self.detected_segments
