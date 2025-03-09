@@ -1,11 +1,12 @@
 import json
 import logging
 import os
-import queue
 import threading
+from queue import Queue
 
 from yt_dlp import YoutubeDL
 
+from .ds_instance import DatasetInstance
 from ..clipper import Clipper
 from ..utils import MyEnv, get_logger
 
@@ -15,25 +16,31 @@ log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 class DatasetDownloader:
 
-	def __init__(self) -> None:
+	def __init__(self, dir_dataset: str, dir_segments: str) -> None:
 		"""
 		Constructor for the DatasetDownloader class.
 		"""
 
-		self.dir_dataset: str = MyEnv.dataset_source
+		self.dir_dataset: str = dir_dataset
 		""" Directory where the dataset is stored """
 
-		self.dir_clips: str = MyEnv.dataset_clips
-		""" Directory where the clips are stored """
-		
+		self.dir_segments: str = dir_segments
+		""" Directory where the segments are stored """
+
 		self.rm_clip_source: bool = MyEnv.delete_yt
 		""" Whether to remove the source video after clipping """
+
+		self.yt_format: dict[str, int | str] = {}
+		""" YouTube video format (width, height, fps, ext), loaded on enter """
 
 		self.yt_video_ids: dict[str, str] = {}
 		""" YouTube video Name:IDs, loaded on enter """
 
-		self.queue = queue.Queue()
-		""" Multi-threading queue """
+		self.queue_yt: Queue[DatasetInstance | None] = Queue()
+		""" Queue for YouTube consumer """
+
+		self.queue_clip: Queue[DatasetInstance | None] = Queue()
+		""" Queue for Clipper consumer """
 
 		return
 
@@ -54,7 +61,8 @@ class DatasetDownloader:
 			ds = json.load(f)
 
 		# Get dataset parameters
-		self.yt_ids = {
+		self.yt_format = ds['format']
+		self.yt_video_ids = {
 			k: v
 			for k, v in ds['vidIds'].items()
 			if not MyEnv.dataset_include or k in MyEnv.dataset_include
@@ -77,20 +85,21 @@ class DatasetDownloader:
 		# Check whether a corresponding csv exists
 		path_csv = os.path.join(self.dir_dataset, f'{name}.csv')
 		if not os.path.exists(path_csv):
-			log.warning(f'Skipping {name} as the corresponding clippings do not exist')
+			log.warning(f'Skipping {name} as the corresponding segments do not exist')
 			return False
 
 		# Check whether the video already exists
-		path_video = os.path.join(self.dir_clips, f'{name}.mp4')
+		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
 		if os.path.exists(path_video):
 			log.info(f'Skipping {name} as the video already exists')
 			return True
 
 		# Create the yt-dlp options
 		ydl_opts = {
-			'outtmpl': os.path.join(self.dir_clips, f'{name}.%(ext)s'),
+			'outtmpl': os.path.join(self.dir_segments, f'{name}.%(ext)s'),
 			'format': self.yt_find_format(yt_id),
 			'quiet': True,
+			'noprogress': True,
 			'concurrent_fragment_downloads': MyEnv.concurrent_downloads,
 		}
 
@@ -129,23 +138,23 @@ class DatasetDownloader:
 		# Return format id
 		return fmt['format_id']
 
-	def clip_video(self, name: str) -> None:
+	def segment_video(self, name: str) -> None:
 		"""
-		Clip a video given its name.
+		Segment a video given its name.
 
 		:param name: Filename of the video (no extension)
 		"""
 
 		# Check whether the video exists
-		path_video = os.path.join(self.dir_clips, f'{name}.mp4')
+		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
 		if not os.path.exists(path_video):
 			log.warning(f'Skipping {name} as the video does not exist')
 			return
 
-		# Clip the video
+		# Segment the video
 		clipper = Clipper(
 			input_filepath=path_video,
-			savedir=self.dir_clips,
+			savedir=self.dir_segments,
 			name=name,
 		)
 
@@ -158,24 +167,29 @@ class DatasetDownloader:
 
 		return
 
-	def main_dwnl_clip_sync(self):
+	def download_segment_all_sync(self):
 		"""
-		Download and clip all the videos in the dataset, synchronously.
+		Download and segment all the videos in the dataset, synchronously.
 
 		:return:
 		"""
 
-		# Create the directory for the videos
-		if not os.path.exists(self.dir_clips):
-			os.makedirs(self.dir_clips)
+		log.info('Downloading dataset synchronously')
 
-		log.debug(f'Downloading dataset to "{self.dir_clips}"')
+		# Create the directory for the videos
+		if not os.path.exists(self.dir_segments):
+			os.makedirs(self.dir_segments)
+
+		log.debug(f'Downloading dataset to "{self.dir_segments}"')
 
 		n_vids = len(self.yt_video_ids)
 		downloaded = []
 
 		# Download all the files
 		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
+
+			if not self.should_download_video(name):
+				continue
 
 			log.info(f'Downloading {i + 1}/{n_vids}: {name}/{yt_id}')
 
@@ -186,77 +200,135 @@ class DatasetDownloader:
 
 		log.info(f'Downloaded {n_downloaded}/{n_vids} videos')
 
-		# Convert full videos to clips
+		# Convert full videos to segments
 		for i, name in enumerate(downloaded):
 
-			log.info(f'Clipping {i + 1}/{n_downloaded}: {name}')
+			log.info(f'Segmenting {i + 1}/{n_downloaded}: {name}')
 
 			clipper = Clipper(
-				input_filepath=os.path.join(self.dir_clips, f'{name}.mp4'),
-				savedir=self.dir_clips,
+				input_filepath=os.path.join(self.dir_segments, f'{name}.mp4'),
+				savedir=self.dir_segments,
 				name=name,
 			)
 
 			with clipper as c:
 				c.export_from_csv(os.path.join(self.dir_dataset, f'{name}.csv'))
 
-		log.info('Finished downloading and clipping all videos')
+		log.info('Finished downloading and segmenting all videos')
 
 		return
 
-	def main_dwnl_clip_async(self):
+	def download_segment_all_async(self):
 
-		# Start the producer
-		producer = threading.Thread(target=self.__yt_producer__)
-		producer.start()
+		log.info('Downloading dataset asynchronously')
 
-		# Start the consumers
+		# Start the YouTube thread
+		thread_yt = threading.Thread(target=self.__consumer_yt__)
+		thread_yt.start()
+
+		# Start the Clipper consumers
 		n_consumers = MyEnv.concurrent_clippers
 		consumers = []
 		for _ in range(n_consumers):
-			consumer = threading.Thread(target=self.__clip_consumer__)
+			consumer = threading.Thread(target=self.__consumer_clipper__)
 			consumer.start()
 			consumers.append(consumer)
 
-		# Wait for the producer to finish
-		producer.join()
+		# Add all the datasets to the queue
+		for competition in self.yt_video_ids:
+			self.queue_yt.put(DatasetInstance(
+				competition=competition,
+				dir_dataset=self.dir_dataset,
+				dir_segments=self.dir_segments,
+			))
+
+		# End the queue
+		self.queue_yt.put(None)
+
+		# Wait for the thread_yt to finish
+		thread_yt.join()
 
 		# Wait for the consumers to finish
 		for consumer in consumers:
 			consumer.join()
 
-		log.info('Finished downloading and clipping all videos')
+		log.info('Finished downloading and segmenting all videos')
 
-	def __yt_producer__(self):
-
-		n_vids = len(self.yt_video_ids)
-
-		# Download all the files
-		for i, (name, yt_id) in enumerate(self.yt_video_ids.items()):
-
-			log.info(f'Downloading {i + 1}/{n_vids}: {name}/{yt_id}')
-
-			if self.yt_download(name, yt_id):
-				self.queue.put(name)
-
-		# Signal the consumer that the producer is done
-		self.queue.put(None)
-
-	def __clip_consumer__(self):
+	def __consumer_yt__(self) -> None:
 
 		while True:
 
-			# Get the name of the downloaded video
-			name = self.queue.get()
+			# Get dataset instance
+			ds = self.queue_yt.get()
 
-			# Check if the producer is done
-			if name is None:
-				self.queue.put(None)
+			# Check queue end
+			if ds is None:
+				self.queue_yt.put(None)
 				break
 
-			# Clip the video
-			self.clip_video(name)
-			self.queue.task_done()
+			# Get YouTube id
+			yt_id = self.yt_video_ids[ds.competition]
+
+			# Skip download: no csv
+			if not ds.is_csv_present():
+				log.warning(f'(YouTube Consumer) {ds.competition}: Skipping, CSV not found')
+				self.queue_yt.task_done()
+				continue
+
+			# Skip download: video present or segments present (send to clipper)
+			if ds.is_video_present() or not ds.handler_diff():
+				log.debug(f'(YouTube Consumer) {ds.competition}: Skipping, video or all segments found')
+				self.queue_clip.put(ds)
+				self.queue_yt.task_done()
+				continue
+
+			log.info(f'(YouTube Consumer) {ds.competition}: Downloading... ({yt_id})')
+
+			# Download video and send to clipper
+			self.yt_download(ds.competition, yt_id)
+			self.queue_clip.put(ds)
+			self.queue_yt.task_done()
+
+			log.info(f'(YouTube Consumer) {ds.competition}: Downloading done ({yt_id})')
+
+		# Signal the clipper consumer there are no more videos
+		self.queue_clip.put(None)
+
+		return
+
+	def __consumer_clipper__(self):
+
+		while True:
+
+			# Get the dataset instance
+			ds = self.queue_clip.get()
+
+			# Check if the producer is done
+			if ds is None:
+				self.queue_clip.put(None)
+				break
+
+			# Skip segment: no csv
+			if not ds.is_csv_present():
+				log.warning(f'(Clipper Consumer) {ds.competition}: Skipping, CSV not found')
+				self.queue_clip.task_done()
+				continue
+
+			# Skip segment: segments present
+			if not ds.handler_diff():
+				log.debug(f'(Clipper Consumer) {ds.competition}: Skipping, all segments found')
+				self.queue_clip.task_done()
+				continue
+
+			log.info(f'(Clipper Consumer) {ds.competition}: Segmenting...')
+
+			# Segment the video
+			self.segment_video(ds.competition)
+			self.queue_clip.task_done()
+
+			log.info(f'(Clipper Consumer) {ds.competition}: Segmenting done')
+
+		return
 
 
 def padded_ratio(n: int, top: int, pad: str = " ") -> str:

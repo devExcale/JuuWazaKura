@@ -1,8 +1,7 @@
 import argparse
 import json
-import logging
-import os
 
+from jwk.utils import MyEnv
 from .ds_downloader import DatasetDownloader
 from .ds_handler import DatasetHandler
 
@@ -14,12 +13,12 @@ parser.add_argument(
 )
 
 
-def main_stats(dir_dataset: str):
+def main_stats():
+	# Initialize dataset
 	handler = DatasetHandler()
-	handler.config()
 
 	# Load all the data
-	handler.load_all()
+	handler.load_all(MyEnv.dataset_source)
 
 	# Clean the data
 	handler.clean_data()
@@ -37,35 +36,38 @@ def main_stats(dir_dataset: str):
 	print('Unknown throws:', unknown_throws)
 
 
-def main_download(dir_dataset: str):
-	with DatasetDownloader(dir_dataset) as downloader:
-		downloader.main_dwnl_clip_async()
+def main_download():
+	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
+		downloader.download_segment_all_async()
+
+	return
 
 
-def main_ytformats(dir_dataset: str):
+def main_ytformats():
 	formats: dict[str, str] = {}
 
-	with DatasetDownloader(dir_dataset) as downloader:
+	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
 		for yt_id in downloader.yt_video_ids.values():
 			formats[yt_id] = downloader.yt_find_format(yt_id)
 
 	print(json.dumps(formats, indent=4))
 
+	return
+
 
 def main():
-	logging.basicConfig(level=logging.DEBUG)
-
-	cwd = os.getcwd()
-	dir_dataset = os.path.join(cwd, 'dataset')
+	switch = {
+		'stats': main_stats,
+		'download': main_download,
+		'ytformats': main_ytformats,
+	}
 
 	args = parser.parse_args()
+	main_method = switch.get(args.action, parser.print_help)
 
-	if args.action == 'stats':
-		main_stats(dir_dataset)
-	elif args.action == 'download':
-		main_download(dir_dataset)
-	elif args.action == 'ytformats':
-		main_ytformats(dir_dataset)
+	main_method()
+
+	return
 
 
 if __name__ == '__main__':

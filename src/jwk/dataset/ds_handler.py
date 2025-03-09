@@ -12,39 +12,36 @@ log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 class DatasetHandler:
 
-	def __init__(self):
-		# Search for dataset folder at project root
-		parent_dir = os.path.dirname(os.path.abspath(__file__))
-		for _ in range(3):
-			parent_dir = os.path.dirname(parent_dir)
-
-		self.directory: Optional[str] = os.path.join(parent_dir, 'dataset')
-		"Path to the folder containing the csv files."
+	def __init__(self) -> None:
 
 		self.df = pd.DataFrame()
-		"Main DataFrame to store the data."
+		""" Main DataFrame to store the data. """
 
 		self.columns: Set[str] = set()
-		"Columns that must be present in the CSV files."
+		""" Columns that must be present in the CSV files. """
 
 		self.stats_columns: Set[str] = set()
-		"Columns for which statistics must be computed."
+		""" Columns for which statistics must be computed. """
 
 		self.throws_known: Set[str] = set()
-		"List of known throws."
+		""" List of known throws. """
 
 		self.throws_aliases: Dict[str, str] = {}
+		""" Mapping of throw aliases. """
 
-		log.debug("Initialized DatasetHandler on directory: %s", self.directory)
+		self.__apply_config__()
 
-	def config(self) -> None:
+		return
+
+	def __apply_config__(self, config_json_path: str | None = None) -> None:
 
 		# Get json file path
-		parent_dir = os.path.dirname(os.path.abspath(__file__))
-		config_path = os.path.join(parent_dir, 'dataset_config.json')
+		if config_json_path is None:
+			parent_dir = os.path.dirname(os.path.abspath(__file__))
+			config_json_path = os.path.join(parent_dir, 'dataset_config.json')
 
 		# Read the json file
-		with open(config_path, 'r') as file:
+		with open(config_json_path, 'r') as file:
 			config = json.load(file)
 
 		# Set the configuration variables
@@ -59,24 +56,31 @@ class DatasetHandler:
 		# Set dataframe
 		self.df = pd.DataFrame(columns=list(self.columns))
 
-	def load_all(self) -> None:
-		"""
-		Loads all the csv files in the directory.
-		"""
-		for file in os.listdir(self.directory):
-			if file.endswith('.csv'):
-				self.load(self.directory + '/' + file)
 		return
 
-	def load(self, filepath: str) -> None:
+	def load_all(self, directory: str) -> None:
 		"""
-		Loads a csv file.
-		:param filepath: Name of the csv file.
+		Loads all the csv files in the dataset directory.
+
+		See also: load()
+		"""
+
+		for file in os.listdir(directory):
+			if file.endswith('.csv'):
+				self.load(os.path.join(directory, file))
+
+		return
+
+	def load(self, csv_path: str) -> None:
+		"""
+		Loads a csv file and appends it to the internal dataframe.
+
+		:param csv_path: Path to the csv file.
 		"""
 
 		# Read the CSV file
 		loaded_df = pd.read_csv(
-			filepath,
+			csv_path,
 			sep=',',
 			header=0,
 			dtype=str
@@ -85,9 +89,10 @@ class DatasetHandler:
 		# Assert needed columns are present
 		missing_cols = self.columns - set(loaded_df.columns)
 		if missing_cols:
-			filename = filepath.split('/')[-1]
-			raise ValueError(
-				f"Missing columns in {filename}: {', '.join(missing_cols)} | Present: {', '.join(loaded_df.columns)}")
+			filename = csv_path.split('/')[-1]
+			str_missing_cols = ', '.join(missing_cols)
+			str_present_cols = ', '.join(loaded_df.columns)
+			raise ValueError(f"Missing columns in {filename}: [{str_missing_cols}] | Present: [{str_present_cols}]")
 
 		# Append the data to the main DataFrame
 		# TODO: replace concat with better approach
@@ -143,6 +148,59 @@ class DatasetHandler:
 		}
 
 		return stats
+
+	def should_download_video(self, name: str) -> bool:
+		"""
+		Check whether a video should be downloaded.
+		A video should be downloaded if there exists a corresponding csv file, the video does not exist
+		and all video segments don't exist.
+
+		:param name: Filename of the video (no extension)
+		:return: Whether the video should be downloaded
+		"""
+
+		# Check whether a corresponding csv exists
+		path_csv = os.path.join(self.dir_dataset, f'{name}.csv')
+		if not os.path.exists(path_csv):
+			return False
+
+		# Check whether the video already exists
+		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
+		if os.path.exists(path_video):
+			return False
+
+		# Check whether the segments directory exists
+		if not os.path.exists(os.path.join(self.dir_segments, name)):
+			return True
+
+		# Load dataset with csv file
+		ds_handler = DatasetHandler()
+		ds_handler.load(path_csv)
+
+		# Get all the throws start frames
+		ds_start_ms = set(map(lambda t: int(ts_to_sec(t) * 1000), ds_handler.df['ts_start']))
+
+		regex_segment_filename = rf'^{name}-(\d)+\.mp4$'
+
+		# Look for video segments on filepath
+		os_start_ms = set(
+			map(
+				# Extract the milliseconds from the filename
+				lambda m: int(m.group(1)),
+				filter(
+					# Look for matches
+					lambda m: m is not None,
+					map(
+						# Map filenames to regex match objects
+						lambda filename: match(regex_segment_filename, filename),
+						os.listdir(os.path.join(self.dir_segments, name))
+					)
+				)
+			)
+		)
+
+		# If there are missing segments, download the video
+		return bool(ds_start_ms - os_start_ms)
 
 
 def std_throw_name(name: str) -> str:

@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from ..utils import get_framestamp
+from ..utils import get_framestamp, ts_to_sec
 
 log = logging.getLogger(__name__)
 
@@ -76,23 +76,25 @@ class Clipper:
 		"""
 		Exports a clip from the opened video to another file.
 
-		:param start: Start frame number or timestamp in the format `[HH:]MM:SS`
-		:param end: End frame number or timestamp in the format `[HH:]MM:SS`
+		:param start: Timestamp in the format `[HH:]MM:SS.000` or milliseconds from the start of the video
+		:param end: Timestamp in the format `[HH:]MM:SS.000` or milliseconds from the start of the video
 		:param sim: Simulate exporting the clip without actually writing the file
 		"""
 
-		# Convert timestamps to frame numbers
-		start, end = get_framestamp(start, end, self.fps)
+		# Convert timestamps to milliseconds and frame numbers
+		ms_start = int(ts_to_sec(start) * 1000)
+		ms_end = int(ts_to_sec(end) * 1000)
+		frame_start, frame_end = get_framestamp(start, end, self.fps)
 
 		# Check if the start and end frames are within the video length
-		if start < 0 or end < 0 or start >= self.frame_count or end >= self.frame_count:
-			raise ValueError(f"Start and end frames must be within the video length: {self.name}/{start}-{end}")
+		if frame_start < 0 or frame_end < 0 or frame_start >= self.frame_count or frame_end >= self.frame_count:
+			raise ValueError(f"Start and end frames must be within the video length: {self.name}/{ms_start}-{ms_end}")
 
 		# Check if start/end are in the correct order
-		if start > end:
-			raise ValueError(f"Start frame must be before the end frame: {self.name}/{start}-{end}")
+		if frame_start > frame_end:
+			raise ValueError(f"Start frame must be before the end frame: {self.name}/{ms_start}-{ms_end}")
 
-		clip_name = f"{self.name}-{start}.mp4"
+		clip_name = f"{self.name}-{ms_start}.mp4"
 		clip_path = os.path.join(self.output_dir, clip_name)
 
 		# Check if clip was already exported
@@ -106,7 +108,7 @@ class Clipper:
 			return
 
 		# Set the start frame
-		self.cap.set(cv2.CAP_PROP_POS_FRAMES, start)
+		self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_start)
 
 		# Initialize the video writer
 		out_frame_size = self.output_size or self.frame_size
@@ -114,7 +116,7 @@ class Clipper:
 		writer = cv2.VideoWriter(clip_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
 
 		# Read and write the frames to the output video file
-		for i in range(start, end + 1):
+		for i in range(frame_start, frame_end + 1):
 
 			ok, frame = self.cap.read()
 			if not ok:
@@ -150,19 +152,12 @@ class Clipper:
 
 		# Export clips based on the timestamps
 		for row in df.itertuples():
-			start = row.ts_start
-			end = row.ts_end
+			ts_start = row.ts_start
+			ts_end = row.ts_end
 
-			self.export(start, end, sim=sim)
+			self.export(ts_start, ts_end, sim=sim)
 
 		return
-
-	def clip_name(self, start: Union[int, str], end: Union[int, str]) -> str:
-		"""
-		Returns the name of a clip based on the start and end frame numbers.
-		"""
-		start, end = get_framestamp(start, end, self.fps)
-		return f"{self.name}-{start}-{end}.mp4"
 
 
 def sharpen(image: np.ndarray) -> np.ndarray:
