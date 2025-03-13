@@ -95,7 +95,7 @@ class DatasetInstance:
 
 		:raise FileNotFoundError: If the CSV file is not found.
 		:raise ValueError: If the dataset data is not valid.
-		:return: `None`
+		:return: ``None``
 		"""
 
 		if not self.is_csv_present():
@@ -105,7 +105,7 @@ class DatasetInstance:
 			self.ds_handler = DatasetHandler()
 			self.ds_handler.load(self.path_csv)
 
-		self.ds_handler.validate_data()
+		self.ds_handler.finalize()
 
 		return
 

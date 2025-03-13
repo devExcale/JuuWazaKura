@@ -19,9 +19,7 @@ def main_stats():
 
 	# Load all the data
 	handler.load_all(MyEnv.dataset_source)
-
-	# Clean the data
-	handler.clean_data()
+	handler.finalize()
 
 	# Find unknown throws
 	unknown_throws = handler.get_unknown_throws()

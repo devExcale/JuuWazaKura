@@ -6,3 +6,5 @@ yt-dlp==2025.02.19
 opencv-python~=4.10.0.84
 numpy~=1.26.4
 python-dotenv~=1.0.1
+tensorflow==2.19.0
+keras~=3.9.0

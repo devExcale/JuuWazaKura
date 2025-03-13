@@ -11,7 +11,11 @@
 		"throw",
 		"tori"
 	],
-	"throws_known": [
+	"known_tori": [
+		"blue",
+		"white"
+	],
+	"known_throws": [
 		"ashi guruma",
 		"de ashi barai",
 		"eri seoi nage",
@@ -48,10 +52,10 @@
 		"yoko otoshi",
 		"yoko tomoe nage"
 	],
-	"throws_aliases": {
+	"throw_aliases": {
 		"sawari seoi": "sawari seoi nage"
 	},
-	"throws_groups": {
+	"throw_groups": {
 		"seoi nage": [
 			"eri seoi nage",
 			"ippon seoi nage",
