@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from collections.abc import Callable
 from re import match
 from typing import Generator, Hashable
 
@@ -100,22 +101,51 @@ class DatasetHandler:
 
 		return
 
-	def load_all(self, directory: str) -> None:
+	def load_all(
+			self,
+			directory: str,
+			include: set[str] | None = None,
+			exclude: set[str] | None = None
+	) -> None:
 		"""
 		Loads all the csv files in the dataset directory.
 
-		See also: load()
+		See also: ``load()``
+
+		:param directory: Path to the directory containing the csv files.
+		:param include: Set of filenames to filter the files to load. Overrides the excludes list.
+		:param exclude: Set of filenames to exclude from the files to load.
 		"""
 
 		self.__finalize_barrier__()
 
+		# Include overrides exclude
+		if include:
+			exclude = None
+
 		# Initialize loaded dataframes list
 		concat_list: list[pd.DataFrame] = [self.df]
 
-		# Load all dataframes in directory
+		# Loop all files in directory
 		for file in os.listdir(directory):
-			if file.endswith('.csv'):
-				self.load(os.path.join(directory, file), concat_list=concat_list)
+
+			# Exclude other than csv files
+			if not file.endswith('.csv'):
+				continue
+
+			# Filename without extension (competition code)
+			code = file[:-4]
+
+			# Look for includes only
+			if include and code not in include:
+				continue
+
+			# Exclude files
+			if exclude and code in exclude:
+				continue
+
+			# Load dataframe
+			self.load(os.path.join(directory, file), concat_list=concat_list)
 
 		# Concatenate all dataframes
 		self.df = pd.concat(concat_list, ignore_index=True)
@@ -169,9 +199,19 @@ class DatasetHandler:
 		if self.finalized:
 			return
 
+		flag_errors = False
+
 		# Loop over rows
 		for index, row in self.df.iterrows():
-			self.__finalize_row__(index, row)
+			try:
+				self.__finalize_row__(index, row)
+			except ValueError as e:
+				flag_errors = True
+				log.error(e)
+
+		# Raise error if any
+		if flag_errors:
+			raise ValueError("Fix dataset before proceeding")
 
 		# Update actual labels
 		self.throw_classes = list(sorted(
@@ -232,6 +272,10 @@ class DatasetHandler:
 		if start >= end:
 			raise ValueError(f"Invalid timestamps order: {row_id}")
 
+		# Ensure segments aren't more than 10 seconds
+		if end - start > 10:
+			raise ValueError(f"Segment mustn't be longer than 10 seconds: {row_id}")
+
 		# Check invalid tori names
 		if tori not in self.known_tori:
 			raise ValueError(f"Unknown tori label: {row_id}")
@@ -279,69 +323,84 @@ class DatasetHandler:
 
 		return stats
 
-	def xy_generator(self, raise_on_error: bool = False) -> Generator[tuple[list[np.ndarray], str, str], None, None]:
+	def xy(self, index: Hashable, row: pd.Series | None = None) -> tuple[list[np.ndarray], str, str]:
+
+		if row is None:
+			row = self.df.loc[index]
+
+		# Record attributes
+		competition = row['competition']
+		throw = row['throw']
+		tori = row['tori']
+		ts_start = row['ts_start']
+
+		# Get video path
+		ms_start = int(ts_to_sec(ts_start) * 1000)
+		clip_name = f'{competition}-{ms_start}.mp4'
+		video_path = os.path.join(MyEnv.dataset_clips, competition, clip_name)
+
+		log.trace(f"Loading video: {video_path}")
+
+		frames = []
+
+		# Load video data
+		cap = cv2.VideoCapture(video_path)
+		while cap.isOpened():
+
+			# Read frame
+			ret, frame = cap.read()
+
+			# Break if no frame
+			if not ret:
+				break
+
+			frames.append(frame)
+
+		cap.release()
+
+		# Handle loading error
+		if not frames:
+			raise ValueError(f"Error loading video: {video_path}")
+
+		return frames, throw, tori
+
+	def xy_train(
+			self,
+			index: Hashable,
+			normalize_x: Callable[[list[np.ndarray]], np.ndarray]
+	) -> tuple[np.ndarray, np.ndarray]:
+		"""
+		Loads the video data and returns the processed data and labels.
+		:param index: Data index
+		:param normalize_x: Function to apply to the frames. Takes a list of frames and must return a single numpy array with the stacked processed frames.
+		:return: Tuple with the processed data and labels.
+		"""
+
+		# Get data
+		frames, throw, tori = self.xy(index)
+
+		# Apply mapping function
+		x = normalize_x(frames)
+
+		# Get onehot encodings
+		y_throw = self.throw_onehot[throw]
+		y_tori = self.tori_onehot[tori]
+
+		y = np.concatenate((y_throw, y_tori), axis=0)
+
+		return x, y
+
+	def xy_generator(self) -> Generator[tuple[list[np.ndarray], str, str], None, None]:
 		"""
 		Generator that loads all video data and yields it with the corresponding labels.
 		The frames come as-is from cv2, with no preprocessing.
 
-		:param raise_on_error: Whether to raise an error if a video file can't be loaded.
 		:return: Generator for the dataset data ``(frames,throw,tori)``.
 		"""
 
-		comp_skips: list[str] = []
-
-		# Check for unsegmented competitions
-		for competition in self.df['competition'].unique():
-			if not os.path.exists(os.path.join(MyEnv.dataset_clips, competition)):
-				log.warning(f"Competition not segmented: {competition}")
-				comp_skips.append(competition)
-
 		# Loop over the dataset
 		for index, row in self.df.iterrows():
-
-			# Record attributes
-			competition = row['competition']
-			throw = row['throw']
-			tori = row['tori']
-			ts_start = row['ts_start']
-
-			# Skip unsegmented competitions
-			if competition in comp_skips:
-				continue
-
-			# Get video path
-			ms_start = int(ts_to_sec(ts_start) * 1000)
-			clip_name = f'{competition}-{ms_start}.mp4'
-			video_path = os.path.join(MyEnv.dataset_clips, competition, clip_name)
-
-			frames = []
-
-			# Load video data
-			cap = cv2.VideoCapture(video_path)
-			while cap.isOpened():
-
-				# Read frame
-				ret, frame = cap.read()
-
-				# Break if no frame
-				if not ret:
-					break
-
-				frames.append(frame)
-
-			cap.release()
-
-			# Handle loading error
-			if not frames:
-				msg = f"Error loading video: {video_path}"
-				if raise_on_error:
-					raise ValueError(msg)
-				else:
-					log.warning(msg)
-					continue
-
-			# Yield the data
-			yield frames, throw, tori
+			yield self.xy(index, row)
 
 		# End generator
 		return

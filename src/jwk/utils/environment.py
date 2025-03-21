@@ -35,6 +35,9 @@ class MyEnv:
 	dataset_include: List[str] = []
 	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 
+	dataset_exclude: List[str] = []
+	""" Subset of the dataset to include (dataset id). Empty list includes all. """
+
 	delete_yt: bool = True
 	""" Whether to delete the original dataset videos after clipping. """
 
