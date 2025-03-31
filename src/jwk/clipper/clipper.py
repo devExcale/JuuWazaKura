@@ -113,7 +113,7 @@ class Clipper:
 		# Initialize the video writer
 		out_frame_size = self.output_size or self.frame_size
 		# noinspection PyUnresolvedReferences
-		writer = cv2.VideoWriter(clip_path, cv2.VideoWriter_fourcc(*'mp4v'), self.fps, out_frame_size)
+		writer = cv2.VideoWriter(clip_path, cv2.VideoWriter_fourcc(*'avc1'), self.fps, out_frame_size)
 
 		# Read and write the frames to the output video file
 		for i in range(frame_start, frame_end + 1):
@@ -123,7 +123,7 @@ class Clipper:
 				break
 
 			# Sharpen the frame
-			frame = sharpen(frame)
+			# frame = sharpen(frame)
 
 			# Resize the frame
 			if self.output_size is not None:

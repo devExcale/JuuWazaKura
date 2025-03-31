@@ -1,7 +1,6 @@
-mediapipe==0.10.11
 pandas==2.2.1
 requests==2.32.0
-ultralytics==8.1.45
+ultralytics==8.3.94
 yt-dlp==2025.02.19
 opencv-python~=4.10.0.84
 numpy~=1.26.4
