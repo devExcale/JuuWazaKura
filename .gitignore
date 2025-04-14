@@ -10,6 +10,9 @@ poetry.lock
 *.mp4
 *.part
 
+# Image files
+*.jpg
+
 # Model files
 *.pt
 *.task
