@@ -1,5 +1,3 @@
-# Make code in src directory available
-export PYTHONPATH=$$PYTHONPATH:src
 
 width_clause = $(if $(width),-w $(width),)
 vid_ext ?= mp4

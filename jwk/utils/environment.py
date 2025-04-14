@@ -44,6 +44,18 @@ class MyEnv:
 	log_levelname: str = 'INFO'
 	""" The logging level name. """
 
+	yolo_model: str = 'yolo11s.pt'
+	""" Path to the YOLO model to use for pre-processing. """
+
+	preprocess_n_ymax: int = 5
+	""" Number of boxes lowest in the frame to keep during preprocessing, 0 to keep all. """
+
+	preprocess_hue_bins: int = 180
+	""" Number of bins for hue on gi histogram. """
+
+	preprocess_sat_bins: int = 256
+	""" Number of bins for saturation on gi histogram. """
+
 	@classmethod
 	def log_level(cls) -> int:
 		"""

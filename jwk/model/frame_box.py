@@ -1,7 +1,11 @@
 import math
+import os.path
 
 import cv2
 import numpy as np
+
+from jwk.utils import MyEnv
+from ..devtools.gipick import filename_gi_histogram
 
 WHITE = np.array([255, 255, 255])
 BLUE = np.array([0, 0, 255])
@@ -70,6 +74,43 @@ class FrameBox:
 		no_intersect = self.x2 < o.x1 or self.x1 > o.x2 or self.y2 < o.y1 or self.y1 > o.y2
 
 		return not no_intersect
+
+	def slice(self, frame: np.ndarray) -> np.ndarray:
+		"""
+		Slices the frame with the bounding box.
+		If part of the bounding box is outside the frame, it will pad the missing part with black pixels.
+
+		:param frame: Frame to slice.
+		:return: Sliced frame.
+		"""
+
+		h_frame, w_frame, _ = frame.shape
+
+		# Clip coordinates
+		x1 = max(0, self.x1)
+		y1 = max(0, self.y1)
+		x2 = min(w_frame, self.x2)
+		y2 = min(h_frame, self.y2)
+
+		# Slice the frame
+		sliced_frame = frame[y1:y2, x1:x2]
+
+		# Compute pad sizes
+		pad_top = max(0, -self.y1)
+		pad_bottom = max(0, self.y2 - h_frame)
+		pad_left = max(0, -self.x1)
+		pad_right = max(0, self.x2 - w_frame)
+
+		# Add padding if necessary
+		if pad_top or pad_bottom or pad_left or pad_right:
+			sliced_frame = cv2.copyMakeBorder(
+				sliced_frame,
+				pad_top, pad_bottom, pad_left, pad_right,
+				borderType=cv2.BORDER_CONSTANT,
+				value=(0, 0, 0),
+			)
+
+		return sliced_frame
 
 	def athlete_score(
 			self,
@@ -274,20 +315,6 @@ class FrameBox:
 
 		return self
 
-	def hsv(self, frame: np.ndarray) -> np.ndarray:
-		"""
-		Returns the pixel values of the bounding box in HSV color space.
-
-		:param frame: Frame to compute the HSV values.
-		"""
-
-		# Get the bounding box
-		box = frame[self.y1:self.y2, self.x1:self.x2]
-		# Convert to HSV
-		hsv = cv2.cvtColor(box, cv2.COLOR_BGR2HSV)
-
-		return hsv
-
 	def histogram_huesat(self, frame: np.ndarray, hue_bins: int = 180, sat_bins: int = 256) -> np.ndarray:
 		"""
 		Calculates a 2D histogram of Hue and Saturation for the bounding box.
@@ -322,13 +349,19 @@ class FrameBox:
 	def athlete_score_v3(
 			self,
 			frame: np.ndarray,
-			prototype_hist: np.ndarray,
 			hue_bins: int = 180,
 			sat_bins: int = 256,
 	) -> float:
 		"""
 
 		"""
+
+		# Load prototype histogram from dataset
+		filepath = os.path.join(MyEnv.dataset_source, filename_gi_histogram(hue_bins, sat_bins))
+		try:
+			prototype_hist = np.load(filepath)
+		except FileNotFoundError:
+			raise FileNotFoundError("Prototype histogram not found. Please generate it first.")
 
 		# Histogram similarity (Bhattacharyya distance - lower is better)
 		bhattacharyya = cv2.compareHist(

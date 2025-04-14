@@ -2,9 +2,8 @@ import os
 
 import cv2
 import numpy as np
+from ultralytics import YOLO
 
-from .yolov11 import frame_inference, YOLO
-from ..model import FrameBox
 from ..utils import MyEnv
 
 
@@ -73,6 +72,8 @@ def main_export(ds_folder: str, gi_folder: str, model_path: str):
 	Export the top 5 bounding boxes (based on scores) to the gi folder.
 	"""
 
+	from .yolov11 import frame_inference
+
 	os.makedirs(gi_folder, exist_ok=True)
 
 	# Load the YOLO model
@@ -130,8 +131,11 @@ def main_histogram(gi_folder: str, hue_bins: int = 180, sat_bins: int = 256):
 	:return: The averaged prototype histogram.
 	"""
 
+	# Circular imports baby!
+	from ..model import FrameBox
+
 	# Prototype histogram
-	prototype_hist = create_prototype_histogram(gi_folder, hue_bins, sat_bins)
+	prototype_hist = compute_gi_histogram(hue_bins, sat_bins)
 
 	if prototype_hist is None:
 		print("No images found in the gi folder.")
@@ -189,56 +193,72 @@ def main_histogram(gi_folder: str, hue_bins: int = 180, sat_bins: int = 256):
 	return
 
 
-def create_prototype_histogram(gi_folder: str, hue_bins: int = 180, sat_bins: int = 256) -> np.ndarray | None:
+def filename_gi_histogram(hue_bins: int, saturation_bins: int) -> str:
+	"""
+	Generate a filename for the histogram based on Hue and Saturation.
+
+	:param hue_bins: Number of bins for Hue.
+	:param saturation_bins: Number of bins for Saturation.
+	:return: The filename for the histogram.
+	"""
+
+	return f'gi_hist_{hue_bins}_{saturation_bins}.npy'
+
+
+def compute_gi_histogram(hue_bins: int, saturation_bins: int) -> np.ndarray:
 	"""
 	Creates a prototype Hue-Saturation histogram by averaging histograms from sample judogi images.
 
-	:param gi_folder: Path to the folder containing images.
 	:param hue_bins: Number of bins for Hue.
-	:param sat_bins: Number of bins for Saturation.
+	:param saturation_bins: Number of bins for Saturation.
 	:return: The averaged prototype histogram.
 	"""
 
-	all_hists = []
-	subfolders = ['white', 'blue']
-
-	list_img = [
-		os.path.join(gi_folder, subfolder, filename)
-		for subfolder in subfolders
-		for filename in os.listdir(os.path.join(gi_folder, subfolder))
+	# Get subfolders paths
+	gi_folders = [
+		os.path.join(MyEnv.dataset_source, 'gi', subfolder)
+		for subfolder in ('white', 'blue')
 	]
 
-	for img_path in list_img:
+	# Get images paths
+	images = [
+		os.path.join(folder, filename)
+		for folder in gi_folders
+		for filename in os.listdir(folder)
+		if filename.split('.')[-1] in {'jpg', 'png', 'jpeg'}
+	]
 
+	hists = []
+
+	# Loop over all images
+	for img_path in images:
+
+		# Read image
 		img = cv2.imread(img_path)
 		if img is None:
 			continue
 
+		# Get hue and saturation channels
 		hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 		hue = hsv_img[:, :, 0]
 		saturation = hsv_img[:, :, 1]
 
+		# Compute histogram
 		hist = cv2.calcHist(
 			[hue, saturation],
 			[0, 1],
 			None,
-			[hue_bins, sat_bins],
+			[hue_bins, saturation_bins],
 			[0, 180, 0, 256]
 		)
 
-		all_hists.append(hist)
+		hists.append(hist)
 
-	if not all_hists:
-		return None
+	if not hists:
+		raise FileNotFoundError("No images found in the gi folders to create a histogram.")
 
-	avg_hist = np.mean(all_hists, axis=0)
+	# Compute average histogram (normalized)
+	avg_hist = np.mean(hists, axis=0)
 	cv2.normalize(avg_hist, avg_hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
 
 	return avg_hist
-
-
-PROTOHIST = create_prototype_histogram(
-	os.path.join(MyEnv.dataset_source, "gi"),
-	# hue_bins=90,
-	# sat_bins=128
-)

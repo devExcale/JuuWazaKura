@@ -47,14 +47,6 @@ def video_annotate_objects(model: str, video_path: str, output_path: str):
 
 	log.debug(f"Output video file: {output_path}")
 
-	# Initialize Kalman filter
-	dim_state = 4
-	dim_meas = 4
-	kf = cv2.KalmanFilter(dim_state, dim_meas)
-	kf.transitionMatrix = np.array(np.identity(4), np.float32)
-	kf.measurementMatrix = np.array(np.identity(4), np.float32)
-	kf.processNoiseCov = np.array(np.identity(4), np.float32) * 0.1
-
 	# Initialize the tracker
 	tracker = Tracker(4, 4)
 
@@ -114,11 +106,6 @@ def frame_inference(
 	:return: Detected classes, athlete scores, bounding boxes, inferred index, inferred athlete box.
 	"""
 
-	from .gipick import PROTOHIST
-
-	if PROTOHIST is None:
-		raise AssertionError("PROTOHIST is not set. Please run the histogram first.")
-
 	# Perform object detection
 	results: list[Results] = model(frame)
 
@@ -142,7 +129,7 @@ def frame_inference(
 	boxes = sorted(boxes, key=lambda b: b.y2, reverse=True)[:6]
 
 	# scores = [box.athlete_score(frame, thickness=10, n_rows=4, n_cols=4) for box in boxes]
-	scores = [box.athlete_score_v3(frame, PROTOHIST) for box in boxes]
+	scores = [box.athlete_score_v3(frame) for box in boxes]
 	i_max_score = np.argmax(scores)
 
 	# Get the bounding box containing the athletes
