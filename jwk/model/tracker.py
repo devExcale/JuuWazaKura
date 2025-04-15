@@ -38,7 +38,7 @@ class Tracker:
 
 		return
 
-	def predict(self, measurement: np.ndarray) -> np.ndarray:
+	def predict(self, measurement: np.ndarray | None) -> np.ndarray | None:
 		"""
 		Corrects the Kalman filter with the given measurements.
 
@@ -48,6 +48,10 @@ class Tracker:
 
 		# Initialize first filter measurement
 		if self.first_predict:
+
+			if measurement is None:
+				return None
+
 			self.first_predict = False
 			self.kf.statePost = measurement
 			return measurement
@@ -56,6 +60,7 @@ class Tracker:
 		prediction = self.kf.predict()
 
 		# Correct the Kalman filter with the new measurement
-		self.kf.correct(measurement)
+		if measurement is not None:
+			self.kf.correct(measurement)
 
 		return prediction

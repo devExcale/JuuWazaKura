@@ -241,7 +241,7 @@ def compute_gi_histogram(hue_bins: int, saturation_bins: int) -> np.ndarray:
 		# Get hue and saturation channels
 		hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 		hue = hsv_img[:, :, 0]
-		saturation = hsv_img[:, :, 1]
+		saturation = hsv_img[:, :, 2]
 
 		# Compute histogram
 		hist = cv2.calcHist(

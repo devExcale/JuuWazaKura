@@ -330,7 +330,7 @@ class FrameBox:
 
 		# Extract the Hue and Saturation channels
 		hue = hsv_box[:, :, 0]
-		saturation = hsv_box[:, :, 1]
+		saturation = hsv_box[:, :, 2]
 
 		# Calculate the 2D histogram
 		hist = cv2.calcHist(

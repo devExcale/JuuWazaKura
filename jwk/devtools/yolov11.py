@@ -201,31 +201,28 @@ def annotate_competition_segments(model: str, competition: str) -> None:
 	return
 
 
-def apply_filter(model: str, competition: str) -> None:
+def apply_filter(competition: str) -> None:
 	# List competition segments
 	parent_segments: str = MyEnv.dataset_clips
 	segments: list[str] = os.listdir(os.path.join(parent_segments, competition))
 
 	# Check output directory
-	output_dir = os.path.join(parent_segments, f"{model}-{competition}-filter")
+	output_dir = os.path.join(parent_segments, f"{competition}-filter")
 	if not os.path.exists(output_dir):
 		os.makedirs(output_dir)
 
 	for filename in segments:
 		# Get the input and output paths
 		input_path = os.path.join(parent_segments, competition, filename)
-		output_path = os.path.join(parent_segments, f"{model}-{competition}-filter", filename)
+		output_path = os.path.join(parent_segments, f"{competition}-filter", filename)
 
 		# Annotate the video
-		video_filter_huesat(model, input_path, output_path)
+		video_filter_huesat(input_path, output_path)
 
 	return
 
 
-def video_filter_huesat(model: str, video_path: str, output_path: str):
-	# Load the YOLO model
-	model = YOLO(model, verbose=False)
-
+def video_filter_huesat(video_path: str, output_path: str) -> None:
 	# Open the video file
 	cap = cv2.VideoCapture(video_path)
 	if not cap.isOpened():
@@ -234,6 +231,8 @@ def video_filter_huesat(model: str, video_path: str, output_path: str):
 
 	log.debug(f"Opened video file: {video_path}")
 
+	hsv = 'hsv'
+
 	# Get video properties
 	width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 	height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -241,12 +240,12 @@ def video_filter_huesat(model: str, video_path: str, output_path: str):
 
 	# Define the codec and create VideoWriter object
 	fourcc = cv2.VideoWriter_fourcc(*'avc1')
-	out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+	path_no_ext, ext = os.path.splitext(output_path)
+	out_sv = cv2.VideoWriter(f"{path_no_ext}_sv{ext}", fourcc, fps, (width, height))
+	out_hv = cv2.VideoWriter(f"{path_no_ext}_hv{ext}", fourcc, fps, (width, height))
+	out_hs = cv2.VideoWriter(f"{path_no_ext}_hs{ext}", fourcc, fps, (width, height))
 
 	log.debug(f"Output video file: {output_path}")
-
-	t_boxes: list[FrameBox] = []
-	""" List of inferred boxes. """
 
 	while cap.isOpened():
 
@@ -258,29 +257,35 @@ def video_filter_huesat(model: str, video_path: str, output_path: str):
 		frame_out = frame_in.copy()
 
 		# Write the frame to the output video
-		out.write(frame_huesat(frame_out))
+		out_sv.write(hsv_flatten(frame_in, 0))
+		out_hv.write(hsv_flatten(frame_in, 1))
+		out_hs.write(hsv_flatten(frame_in, 2))
 
 	# Release resources
 	cap.release()
-	out.release()
+	out_sv.release()
+	out_hv.release()
+	out_hs.release()
 
 	log.info(f"Saved output video file.")
 
 	return
 
 
-def frame_huesat(frame_in: np.ndarray) -> np.ndarray:
+def hsv_flatten(frame_in: np.ndarray, idx: int) -> np.ndarray:
 	"""
-	Remove the HSV value channel and return the frame in BGR color space.
+	Flatten the HSV channels and return the frame in BGR color space.
 
 	:param frame_in: Input frame.
-	:return: Frame with the value channel removed.
+	:param idx: Index of the channel to flatten (0: hue, 1: saturation, 2: value).
+	:return: Frame with the specified channel flattened.
 	"""
+
 	# Convert the frame to HSV color space
 	hsv_frame = cv2.cvtColor(frame_in, cv2.COLOR_BGR2HSV)
 
-	# Set the value channel to zero
-	hsv_frame[:, :, 2] = 128
+	# Flatten the specified channel
+	hsv_frame[:, :, idx] = 128
 
 	# Convert back to BGR color space
 	frame_out = cv2.cvtColor(hsv_frame, cv2.COLOR_HSV2BGR)

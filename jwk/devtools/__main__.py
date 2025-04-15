@@ -109,7 +109,7 @@ def cmd_filter() -> None:
 	Apply filter to competition segments.
 	"""
 
-	apply_filter('yolo11s.pt', 'TLIG2202D1T3')
+	apply_filter('SAR2210D2T2FIN')
 
 	return
 
