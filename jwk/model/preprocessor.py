@@ -122,7 +122,7 @@ class JwkPreprocessor:
 
 		# Compute scores
 		# noinspection PyTypeChecker
-		scores = [box.athlete_score_v3(frame) for box in boxes]
+		scores = [box.gi_likelihood(frame) for box in boxes]
 		idx_main_box = np.argmax(scores)
 
 		# Get the bounding box containing the athletes

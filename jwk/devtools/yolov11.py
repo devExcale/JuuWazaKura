@@ -8,8 +8,8 @@ import logging
 
 from ultralytics.engine.results import Results
 
-from ..utils import MyEnv, get_logger
-from ..model import FrameBox, Tracker, draw_box, draw_colors
+from ..utils import MyEnv, get_logger, Drawing
+from ..model import FrameBox, Tracker
 
 # Initialize logging
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
@@ -71,14 +71,14 @@ def video_annotate_objects(model: str, video_path: str, output_path: str):
 			# km_colors, _ = box.kmeans(frame_in, n_colors=8, n_iter=20)
 
 			# params_draw_colors.append((frame_out, box.x1, box.y1, box.x2, box.y2, km_colors, 7))
-			draw_box(frame_out, box.x1, box.y1, box.x2, box.y2, f'{cls} - {score:.4f}', bb_color)
+			Drawing.box(frame_out, box.x1, box.y1, box.x2, box.y2, f'{cls} - {score:.4f}', bb_color)
 
 		# Draw the bounding box containing the athletes
-		draw_box(frame_out, at_box.x1, at_box.y1, at_box.x2, at_box.y2, None, RED, 2)
+		Drawing.box(frame_out, at_box.x1, at_box.y1, at_box.x2, at_box.y2, None, RED, 2)
 
 		# Draw the colors after the bounding boxes
 		for params in params_draw_colors:
-			draw_colors(*params)
+			Drawing.colors(*params)
 
 		# Write the frame to the output video
 		out.write(frame_out)
@@ -129,7 +129,7 @@ def frame_inference(
 	boxes = sorted(boxes, key=lambda b: b.y2, reverse=True)[:6]
 
 	# scores = [box.athlete_score(frame, thickness=10, n_rows=4, n_cols=4) for box in boxes]
-	scores = [box.athlete_score_v3(frame) for box in boxes]
+	scores = [box.gi_likelihood(frame) for box in boxes]
 	i_max_score = np.argmax(scores)
 
 	# Get the bounding box containing the athletes

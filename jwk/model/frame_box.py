@@ -5,13 +5,21 @@ import cv2
 import numpy as np
 
 from jwk.utils import MyEnv
-from ..devtools.gipick import filename_gi_histogram
 
 WHITE = np.array([255, 255, 255])
 BLUE = np.array([0, 0, 255])
 
 
 class FrameBox:
+	"""
+	A class representing a bounding box in a frame.
+	"""
+
+	FILENAME_GI_HISTOGRAM: str = 'gi_histogram.npy'
+	""" Filename for the gi histogram. """
+
+	_gi_histogram: np.ndarray | None = None
+	""" Prototype histogram for gi detection. """
 
 	def __init__(
 			self,
@@ -315,140 +323,71 @@ class FrameBox:
 
 		return self
 
-	def histogram_huesat(self, frame: np.ndarray, hue_bins: int = 180, sat_bins: int = 256) -> np.ndarray:
+	def calc_hv_histogram(self, frame: np.ndarray, normalize: bool = True) -> np.ndarray:
 		"""
-		Calculates a 2D histogram of Hue and Saturation for the bounding box.
+		Calculates a 2D histogram of Hue and Value channels for the bounding box.
 
 		:param frame: The full frame.
-		:param hue_bins: Number of bins for the Hue channel.
-		:param sat_bins: Number of bins for the Saturation channel.
-		:return: The 2D histogram (hue_bins x sat_bins).
+		:param normalize: Whether to normalize the histogram.
+		:return: The 2D histogram (180x256).
 		"""
 
 		# Convert the box to HSV color space
 		hsv_box = cv2.cvtColor(frame[self.y1:self.y2, self.x1:self.x2], cv2.COLOR_BGR2HSV)
 
-		# Extract the Hue and Saturation channels
-		hue = hsv_box[:, :, 0]
-		saturation = hsv_box[:, :, 2]
+		# Extract the Hue and Value channels
+		ch_hue = hsv_box[:, :, 0]
+		ch_val = hsv_box[:, :, 2]
 
 		# Calculate the 2D histogram
 		hist = cv2.calcHist(
-			[hue, saturation],
+			[ch_hue, ch_val],
 			[0, 1],
 			None,
-			[hue_bins, sat_bins],
+			[180, 256],
 			[0, 180, 0, 256]
 		)
 
-		# Normalize the histogram (optional, but often useful for comparison)
-		cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+		# Normalize the histogram
+		if normalize:
+			cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
 
 		return hist
 
-	def athlete_score_v3(
+	def gi_likelihood(
 			self,
 			frame: np.ndarray,
-			hue_bins: int = 180,
-			sat_bins: int = 256,
 	) -> float:
 		"""
-
+		Calculates the likelihood of the bounding box being a judogi based on its Hue-Value histogram.
 		"""
 
-		# Load prototype histogram from dataset
-		filepath = os.path.join(MyEnv.dataset_source, filename_gi_histogram(hue_bins, sat_bins))
-		try:
-			prototype_hist = np.load(filepath)
-		except FileNotFoundError:
+		# Load gi histogram
+		gi_histogram = self.get_gi_histogram()
+		if gi_histogram is None:
 			raise FileNotFoundError("Prototype histogram not found. Please generate it first.")
 
 		# Histogram similarity (Bhattacharyya distance - lower is better)
 		bhattacharyya = cv2.compareHist(
-			self.histogram_huesat(frame, hue_bins, sat_bins),
-			prototype_hist,
+			self.calc_hv_histogram(frame),
+			gi_histogram,
 			cv2.HISTCMP_BHATTACHARYYA
 		)
 
-		hist_score = 1 - bhattacharyya ** 3
-		d_south = frame.shape[0] - self.y2
+		likelihood = 1 - bhattacharyya
 
-		# Combine histogram similarity with other features (adjust weights as needed)
-		score = hist_score  # * 100_000  / (d_south * d_south + 1)
+		return likelihood
 
-		return score
+	@classmethod
+	def get_gi_histogram(cls) -> np.ndarray | None:
 
+		if cls._gi_histogram is not None:
+			return cls._gi_histogram
 
-def draw_box(
-		frame: np.ndarray,
-		x1: int,
-		y1: int,
-		x2: int,
-		y2: int,
-		text: str | None = None,
-		color: tuple[int, int, int] = (0, 255, 0),
-		thickness: int = 2,
-) -> None:
-	"""
-	Write a bounding box with text on the frame.
+		filepath = os.path.join(MyEnv.dataset_source, cls.FILENAME_GI_HISTOGRAM)
+		try:
+			cls._gi_histogram = np.load(filepath)
+		except FileNotFoundError:
+			return None
 
-	:param frame: Frame to write on.
-	:param x1: Top-left x-coordinate.
-	:param y1: Top-left y-coordinate.
-	:param x2: Bottom-right x-coordinate.
-	:param y2: Bottom-right y-coordinate.
-	:param text: Text to write.
-	:param color: Color of the bounding box.
-	:param thickness: Thickness of the bounding box.
-	:return: Frame with bounding box and text.
-	"""
-
-	# Clip the coordinates
-	x1 = max(0, x1)
-	y1 = max(0, y1)
-	x2 = min(frame.shape[1], x2)
-	y2 = min(frame.shape[0], y2)
-
-	# Draw the bounding box
-	cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
-
-	# Draw text
-	if text:
-		cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
-
-	return
-
-
-def draw_colors(
-		frame: np.ndarray,
-		x1: int,
-		y1: int,
-		x2: int,
-		y2: int,
-		colors: set[tuple[int, int, int]],
-		thickness: int = 2,
-) -> None:
-	"""
-	Draw the k-means colors on the bottom side of the bounding box.
-
-	:param frame: Frame to write on.
-	:param x1: Top-left x-coordinate.
-	:param y1: Top-left y-coordinate.
-	:param x2: Bottom-right x-coordinate.
-	:param y2: Bottom-right y-coordinate.
-	:param colors: Set of colors to draw.
-	:param thickness: Side of a color square.
-	:return: Frame with bounding box and colors.
-	"""
-
-	# Clip the coordinates
-	x1 = max(0, x1)
-	y2 = min(frame.shape[0], y2) + 1
-
-	# Draw the colors
-	for i, color in enumerate(colors):
-		x = x1 + i * thickness
-		color = tuple(int(i) for i in color)
-		cv2.rectangle(frame, (x, y2), (x + thickness, y2 + thickness), color, -1)
-
-	return
+		return cls._gi_histogram

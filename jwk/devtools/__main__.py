@@ -1,10 +1,13 @@
+import json
 import os.path
 
 import click
+import cv2
 import numpy as np
 
-from .gipick import main_picker, main_export, compute_gi_histogram, filename_gi_histogram
+from .gipick import main_picker, main_export
 from .yolov11 import annotate_competition_segments, apply_filter
+from ..model import FrameBox
 from ..utils import MyEnv
 
 
@@ -17,52 +20,95 @@ def cmd_devtools() -> None:
 	return
 
 
-@cmd_devtools.command(name='gi-hist')
+@cmd_devtools.command(name='gi-hist-gen')
 @click.option(
-	'--hue-bins', '-h',
-	default=180,
-	help='Number of bins for hue on gi histogram'
+	'--overwrite', '-w',
+	default=False,
+	is_flag=True,
+	help='Overwrite the histogram file if it exists'
 )
-@click.option(
-	'--sat-bins', '-s',
-	default=256,
-	help='Number of bins for saturation on gi histogram'
-)
-def cmd_histogram(hue_bins: int = 180, sat_bins: int = 256) -> None:
+def cmd_histogram(overwrite: bool) -> None:
 	"""
-	Generate the Hue-Saturation histogram for all images in the gi folder.
+	Generate the Hue-Value histogram for all images in the gi folder.
 
-	:param hue_bins: Number of bins for hue on gi histogram
-	:param sat_bins: Number of bins for saturation on gi histogram
+	:param overwrite: Overwrite the histogram file if it exists
 	"""
 
-	# Set the hue and saturation bins in the environment
-	MyEnv.preprocess_hue_bins = hue_bins
-	MyEnv.preprocess_sat_bins = sat_bins
-
-	filepath = os.path.join(MyEnv.dataset_source, filename_gi_histogram(hue_bins, sat_bins))
-	histogram: np.ndarray | None = None
-
-	# Try loading the histogram file
-	if os.path.isfile(filepath):
-		try:
-			histogram = np.load(filepath)
-		except OSError | ValueError:
-			# Ignore loading errors, create new histogram
-			pass
+	# Get histogram if exists
+	histogram: np.ndarray | None = FrameBox.get_gi_histogram()
 
 	# If histogram exists don't create a new one
-	if histogram is not None:
-		click.echo(f'Histogram(hue={hue_bins},sat={sat_bins}) already exists, skipping histogram generation.')
+	if histogram is not None and not overwrite:
+		click.echo(f'Histogram already exists, skipping histogram generation.')
 		return
 
 	# Generate histogram
-	histogram = compute_gi_histogram(hue_bins, sat_bins)
+	histogram = compute_avg_gi_histogram()
 
 	# Save histogram to file
+	filepath = os.path.join(MyEnv.dataset_source, FrameBox.FILENAME_GI_HISTOGRAM)
 	np.save(filepath, histogram)
 
-	click.echo(f'Histogram(hue={hue_bins},sat={sat_bins}) saved to {filepath}.')
+	click.echo(f'Histogram saved to {filepath}.')
+
+	return
+
+
+@cmd_devtools.command(name='gi-hist-test')
+def cmd_test_histogram() -> None:
+	"""
+	Test the histogram generation and loading.
+	"""
+
+	# List of subfolders
+	gi_folder = os.path.join(MyEnv.dataset_source, 'gi')
+	subfolders = ['white', 'blue', 'bin']
+
+	stats = {}
+
+	# Loop through each subfolder
+	for subfolder in subfolders:
+
+		# Check if the subfolder exists
+		subfolder_path = os.path.join(gi_folder, subfolder)
+		if not os.path.exists(subfolder_path):
+			continue
+
+		scores = []
+
+		# Loop through each image in the subfolder
+		for filename in os.listdir(subfolder_path):
+			filepath = os.path.join(subfolder_path, filename)
+			if not os.path.isfile(filepath):
+				continue
+
+			img = cv2.imread(filepath)
+			if img is None:
+				continue
+
+			# Compute histogram score
+			box = FrameBox(0, 0, img.shape[1], img.shape[0])
+			scores.append(box.gi_likelihood(img))
+
+		if not scores:
+			continue
+
+		# Compute stats
+		substats = {
+			'min': np.min(scores),
+			'avg': np.mean(scores),
+			'max': np.max(scores),
+			'median': np.median(scores),
+			'std': np.std(scores),
+		}
+		stats[subfolder] = substats
+
+	if not stats:
+		click.echo("No images found in the gi folder.")
+		return
+
+	# Print results
+	click.echo(json.dumps(stats, indent=4))
 
 	return
 
@@ -112,6 +158,53 @@ def cmd_filter() -> None:
 	apply_filter('SAR2210D2T2FIN')
 
 	return
+
+
+def compute_avg_gi_histogram() -> np.ndarray:
+	"""
+	Creates a prototype Hue-Value histogram by averaging histograms from sample judogi images.
+
+	:return: The averaged prototype histogram.
+	"""
+
+	# Get subfolders paths
+	gi_folders = [
+		os.path.join(MyEnv.dataset_source, 'gi', subfolder)
+		for subfolder in ('white', 'blue')
+	]
+
+	# Get images paths
+	images = [
+		os.path.join(folder, filename)
+		for folder in gi_folders
+		for filename in os.listdir(folder)
+		if filename.split('.')[-1] in {'jpg', 'png', 'jpeg'}
+	]
+
+	list_hists = []
+
+	# Loop over all images
+	for img_path in images:
+
+		# Read image
+		img = cv2.imread(img_path)
+		if img is None:
+			continue
+
+		# Compute histogram with FrameBox
+		box = FrameBox(0, 0, img.shape[1], img.shape[0])
+		hist = box.calc_hv_histogram(img, normalize=False)
+
+		list_hists.append(hist)
+
+	if not list_hists:
+		raise FileNotFoundError("No images found in the gi folders to create a histogram.")
+
+	# Compute average histogram (normalized)
+	avg_hist = np.mean(list_hists, axis=0)
+	cv2.normalize(avg_hist, avg_hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+
+	return avg_hist
 
 
 if __name__ == '__main__':
