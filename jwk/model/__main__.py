@@ -43,12 +43,12 @@ def cmd_train(epochs: int) -> None:
 @cmd_model.command(name='preprocess')
 @click.option(
 	'--input', '-i', 'input_',
-	default=None,
+	default='*',
 	help='Path to the input folder containing the videos to preprocess'
 )
 @click.option(
 	'--output', '-o',
-	default=None,
+	default='pre',
 	help='Path to the output folder'
 )
 def cmd_preprocess(input_: str, output: str) -> None:
@@ -62,32 +62,46 @@ def cmd_preprocess(input_: str, output: str) -> None:
 	if not input_ or not output:
 		raise ValueError('Input and output paths are required.')
 
-	folder_in = os.path.join(MyEnv.dataset_clips, input_)
-	folder_out = os.path.join(MyEnv.dataset_source, output)
+	if input_ == '*':
+		sets = {
+			folder
+			for folder in os.listdir(MyEnv.dataset_clips)
+			if os.path.isdir(os.path.join(MyEnv.dataset_clips, folder))
+		}
+	else:
+		sets = {input_}
+
+	pathjoin = os.path.join
+
+	videos = {
+		pathjoin(MyEnv.dataset_clips, folder, filename): pathjoin(MyEnv.dataset_source, output, folder, filename)
+		for folder in sets
+		for filename in os.listdir(os.path.join(MyEnv.dataset_clips, folder))
+		if filename.endswith('.mp4')
+	}
 
 	preprocessor = JwkPreprocessor()
 
-	videos = [filename for filename in os.listdir(folder_in) if filename.endswith('.mp4')]
-
 	with click.progressbar(
-			videos,
+			videos.items(),
 			label='Preprocessing...',
 			show_eta=False,
 			show_percent=True,
-			item_show_func=lambda s: s if s else '',
+			item_show_func=lambda t: t[0].split('/')[-1].split('\\')[-1] if t else '',
 	) as bar:
 
 		# Iterate over the videos
-		for filename in bar:
-			# Get the input and output paths
-			filepath_in = os.path.join(folder_in, filename)
-			filepath_out = os.path.join(folder_out, filename)
+		for vid_in, vid_out in bar:
+
+			# Check if the output video already exists
+			if os.path.exists(vid_out):
+				continue
 
 			# Create output directory if it doesn't exist
-			os.makedirs(os.path.dirname(filepath_out), exist_ok=True)
+			os.makedirs(os.path.dirname(vid_out), exist_ok=True)
 
 			# Preprocess the video
-			preprocessor.preprocess_video(filepath_in, filepath_out)
+			preprocessor.preprocess_video(vid_in, vid_out)
 
 	return
 

@@ -3,6 +3,7 @@ import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
+from ultralytics.engine.results import Boxes
 
 from .frame_box import FrameBox
 from .tracker import Tracker
@@ -94,6 +95,43 @@ class JwkPreprocessor:
 		:return: Squared subframe with the athlete (hopefully).
 		"""
 
+		# Find the athletes in the frame
+		main_box = self.find_athletes(frame, debug=debug)
+
+		if main_box is None and tracker is None:
+			return np.zeros((224, 224, 3), dtype=np.float32)
+
+		# Apply tracking to the area
+		if tracker is not None:
+
+			measurement = None if main_box is None else main_box.as_np().reshape(-1, 1)
+			prediction = tracker.predict(measurement)
+
+			if prediction is None:
+				return np.zeros((224, 224, 3), dtype=np.float32)
+
+			final_box = FrameBox(*map(int, prediction))
+		else:
+			final_box = main_box
+
+		# Further processing
+		final_box = final_box.square().expand(pixels=10)
+
+		return final_box.slice(frame)
+
+	def find_athletes(
+			self,
+			frame: np.ndarray,
+			debug: dict | None = None
+	) -> FrameBox | None:
+		"""
+		Find the athletes in the frame.
+
+		:param frame: Input frame.
+		:param debug: Dictionary where to dump debug information (optional).
+		:return: FrameBox containing the athletes (if found).
+		"""
+
 		# Perform object detection
 		results = self.model.predict(frame, verbose=False)
 
@@ -105,6 +143,7 @@ class JwkPreprocessor:
 		# Parse results
 		for result in results:
 			for box in result.boxes:
+				box: Boxes
 				classes.append(int(box.cls.item()))
 				xyxy = box.xyxy
 				x1 = int(xyxy[0, 0])
@@ -112,6 +151,9 @@ class JwkPreprocessor:
 				x2 = int(xyxy[0, 2])
 				y2 = int(xyxy[0, 3])
 				boxes.append(FrameBox(x1, y1, x2, y2))
+
+		if not boxes:
+			return None
 
 		filter_n_ymax = MyEnv.preprocess_n_ymax if MyEnv.preprocess_n_ymax > 0 else len(boxes)
 
@@ -126,29 +168,17 @@ class JwkPreprocessor:
 		idx_main_box = np.argmax(scores)
 
 		# Get the bounding box containing the athletes
-		box_pre: FrameBox = intersect_boxes(idx_main_box, boxes, scores)
-		box_post: FrameBox
+		box: FrameBox = intersect_boxes(idx_main_box, boxes, scores)
 
-		# Apply tracking to the area
-		if tracker is not None:
-			pred = tracker.predict(box_pre.as_np().reshape(-1, 1))
-			box_post = FrameBox(*map(int, pred))
-		else:
-			box_post = box_pre
-
-		# Further processing
-		box_post = box_post.square().expand(pixels=10)
-
-		# Add debug info if requested
+		# Debug info
 		if debug is not None:
 			debug['classes'] = classes
 			debug['boxes'] = boxes
 			debug['scores'] = scores
 			debug['idx_main_box'] = idx_main_box
-			debug['main_box'] = box_pre
-			debug['final_box'] = box_post
+			debug['main_box'] = box
 
-		return box_post.slice(frame)
+		return box
 
 
 def intersect_boxes(
@@ -156,7 +186,7 @@ def intersect_boxes(
 		boxes: list[FrameBox],
 		scores: list[float],
 		threshold: float = 0.3
-) -> 'FrameBox':
+) -> FrameBox:
 	"""
 	Given a main box, compute the area containing the boxes that directly intersect with the main box
 	and have a score at least above a certain threshold of the main box.
