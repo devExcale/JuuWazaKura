@@ -32,6 +32,12 @@ class MyEnv:
 	dataset_clips: str = os.path.join(os.getcwd(), 'dataset', 'clips')
 	""" Path to the folder containing the video clips. """
 
+	dataset_preproc: str = os.path.join(os.getcwd(), 'dataset', 'pre')
+	""" Path to the folder containing the video clips. """
+
+	dataset_windows: str = os.path.join(os.getcwd(), 'dataset', 'win')
+	""" Path to the folder containing the video clips. """
+
 	dataset_include: List[str] = []
 	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 

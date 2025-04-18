@@ -337,7 +337,7 @@ class DatasetHandler:
 		# Get video path
 		ms_start = int(ts_to_sec(ts_start) * 1000)
 		clip_name = f'{competition}-{ms_start}.mp4'
-		video_path = os.path.join(MyEnv.dataset_clips, competition, clip_name)
+		video_path = os.path.join(MyEnv.dataset_preproc, competition, clip_name)
 
 		log.trace(f"Loading video: {video_path}")
 
