@@ -97,14 +97,44 @@ class DatasetBatchGenerator(Sequence):
 
 		normalization = self.frames_normalize_fixed_time if self.fixed_frames else self.frames_normalize
 
+		# Loop over requested segments
 		for idx in range(start, end):
+
+			# Get segments
 			x, y = self.ds.xy_train(idx, normalize_x=normalization)
 
+			# Apply transformations (resize and flip)
 			for morph_func in [self.frames_resize, self.frames_resize_flip]:
 				# noinspection PyArgumentList
 				list_data.append(morph_func(x))
 				labels_throw.append(y[:n_throws])
 				labels_tori.append(y[n_throws:])
+
+		# Ensure videos have loaded
+		if len(list_data) == 0:
+			raise ValueError(f'Batch {batch_idx} is empty.')
+
+		# Variable length videos
+		if self.window_frames:
+
+			# Get max number of frames in a video
+			max_frames = max(len(x) for x in list_data)
+
+			# Pad all videos to the max number of frames
+			for i, vid_data in enumerate(list_data):
+				n_frames = len(vid_data)
+
+				if n_frames >= max_frames:
+					continue
+
+				# Apply padding
+				n_pad = max_frames - n_frames
+				list_data[i] = np.pad(
+					vid_data,
+					((0, n_pad), (0, 0), (0, 0), (0, 0)),
+					mode='constant',
+					constant_values=0
+				)
 
 		batch_data = np.array(list_data)
 		batch_throw = np.array(labels_throw)

@@ -1,9 +1,7 @@
-import gc
 import logging
 import os
 from enum import Enum, auto
 
-import click
 import numpy as np
 import psutil
 import tensorflow as tf
@@ -13,6 +11,7 @@ from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.metrics import CategoricalAccuracy, Recall, Precision
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 from ..dataset.ds_generator import DatasetBatchGenerator
 from ..dataset.ds_handler import DatasetHandler
@@ -37,13 +36,13 @@ class JwkModel:
 		self.dataset: DatasetHandler = DatasetHandler()
 		""" Dataset handler object. """
 
-		self.target_size: tuple[int, int] = (112, 112)
+		self.target_size: tuple[int, int] = (224, 224)
 		""" Target size of the input frames. """
 
 		self.target_frames: int = 24
 		""" Number of frames to use as input. """
 
-		self.frame_window: int = 5
+		self.frame_window: int = 6
 		""" Number of frames to use as a sliding window. """
 
 		self.segments_per_batch: int = 8
@@ -51,7 +50,7 @@ class JwkModel:
 		self.model: Model | None = None
 		""" Model object. """
 
-		self.optimizer = Adam(learning_rate=0.002)
+		self.optimizer = Adam(learning_rate=0.001)
 		self.loss_fn = CategoricalCrossentropy()
 		self.accuracy_throw = CategoricalAccuracy(name='accuracy')
 		self.accuracy_tori = CategoricalAccuracy(name='accuracy')
@@ -95,11 +94,7 @@ class JwkModel:
 		base_output = output_layer.output
 
 		# Apply softmax activation to separate outputs
-		out_throw = Lambda(lambda layer: layer[:, :num_throws])(base_output)
-		out_tori = Lambda(lambda layer: layer[:, num_throws:])(base_output)
-		softmax_throw = Lambda(lambda layer: tf.nn.softmax(layer))(out_throw)
-		softmax_tori = Lambda(lambda layer: tf.nn.softmax(layer))(out_tori)
-		model_output = Concatenate()([softmax_throw, softmax_tori])
+		model_output = self._layer_concatenate_softmax(base_output)
 
 		# Compile the model
 		self.model = Model(inputs=input_layer, outputs=model_output)
@@ -114,55 +109,7 @@ class JwkModel:
 
 		return
 
-	def enable_3dcnn_min(self):
-
-		if self.model is not None:
-			raise AssertionError("There's another model already enabled.")
-
-		input_shape = (self.target_frames, *self.target_size, 3)
-		num_throws = len(self.dataset.throw_classes)
-		num_tori = len(self.dataset.tori_classes)
-
-		input_layer = Input(shape=input_shape)
-		output_layer = Dense(num_throws + num_tori, activation='linear')
-
-		# Define model
-		base_model = Sequential([
-			input_layer,
-			Conv3D(16, (3, 3, 3), activation='relu', padding='same', strides=(1, 2, 2)),
-			MaxPooling3D((2, 2, 2)),
-			Conv3D(32, (3, 3, 3), activation='relu', padding='same', strides=(1, 2, 2)),
-			MaxPooling3D((2, 2, 2)),
-			Conv3D(64, (3, 3, 3), activation='relu', padding='same', strides=(1, 2, 2)),
-			MaxPooling3D((2, 2, 2)),
-			Flatten(),
-			Dense(64, activation='relu'),
-			output_layer,
-		])
-
-		base_output = output_layer.output
-
-		# Apply softmax activation to separate outputs
-		out_throw = Lambda(lambda layer: layer[:, :num_throws])(base_output)
-		out_tori = Lambda(lambda layer: layer[:, num_throws:])(base_output)
-		softmax_throw = Lambda(lambda layer: tf.nn.softmax(layer))(out_throw)
-		softmax_tori = Lambda(lambda layer: tf.nn.softmax(layer))(out_tori)
-		model_output = Concatenate()([softmax_throw, softmax_tori])
-
-		# Compile the model
-		self.model = Model(inputs=input_layer, outputs=model_output)
-		self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-
-		self.batch_generator = DatasetBatchGenerator(
-			dataset=self.dataset,
-			segments_per_batch=self.segments_per_batch,
-			input_size=self.target_size,
-			fixed_frames=self.target_frames,
-		)
-
-		return
-
-	def enable_3dcnn_lstm(self):
+	def enable_3dcnn_rnn(self):
 
 		if self.model is not None:
 			raise AssertionError("There's another model already enabled.")
@@ -233,7 +180,7 @@ class JwkModel:
 
 		self.batch_generator = DatasetBatchGenerator(
 			dataset=self.dataset,
-			segments_per_batch=1,
+			segments_per_batch=self.segments_per_batch,
 			input_size=self.target_size,
 			window_frames=self.frame_window,
 		)
@@ -248,7 +195,7 @@ class JwkModel:
 		layer = Conv3D(
 			filters=16,
 			kernel_size=(self.frame_window, 5, 5),
-			strides=(self.frame_window // 2, 1, 1),
+			strides=(self.frame_window // 3, 1, 1),
 			padding='same',
 			activation='relu',
 		)(input_layer)
@@ -263,15 +210,27 @@ class JwkModel:
 			activation='relu',
 		)(layer)
 
-		layer = MaxPooling3D(pool_size=(1, 2, 2))(layer)
+		layer = MaxPooling3D(pool_size=(2, 2, 2))(layer)
+
+		layer = Conv3D(
+			filters=64,
+			kernel_size=(3, 3, 3),
+			strides=(1, 1, 1),
+			padding='same',
+			activation='relu',
+		)(layer)
+
+		layer = MaxPooling3D(pool_size=(2, 2, 2))(layer)
 
 		# Compute the flattened feature size: conv3d filters * downsampled frame size
-		dim_flat_features = 32 * (self.target_size[0] // 4) * (self.target_size[1] // 4)
+		dim_flat_features = 64 * (self.target_size[0] // 8) * (self.target_size[1] // 8)
 
 		layer = Reshape((-1, dim_flat_features))(layer)
 
 		# layer = LSTM(units=64)(layer)
 		layer = GRU(units=32)(layer)
+
+		layer = Dense(64, activation='relu')(layer)
 
 		layer = Dense(32, activation='relu')(layer)
 
@@ -323,91 +282,38 @@ class JwkModel:
 
 		self.enable_new()
 
+		# Early Stopping: Stop training if validation loss doesn't improve for 15 epochs
+		early_stopping = EarlyStopping(
+			monitor='tori_loss',  # Or 'val_throw_loss', 'val_tori_loss', or 'val_throw_accuracy' etc.
+			patience=20,  # Number of epochs with no improvement after which training will be stopped.
+			mode='min',  # 'min' for loss, 'max' for accuracy
+			restore_best_weights=True  # Restore model weights from the epoch with the best monitored value
+		)
+
+		# Learning Rate Scheduler: Reduce LR if validation loss plateaus
+		lr_scheduler = ReduceLROnPlateau(
+			monitor='tori_loss',  # Monitor validation loss
+			factor=0.5,  # Reduce learning rate by half
+			patience=5,  # Reduce after 5 epochs with no improvement (often less than early stopping patience)
+			min_lr=0.00001,  # Don't let the learning rate fall below this
+			verbose=1  # Print messages when the learning rate is reduced
+		)
+
+		callbacks = [early_stopping, lr_scheduler]
+
 		self.model.fit(
 			self.batch_generator,
 			epochs=epochs,
-			workers=4,
+			workers=8,
 			use_multiprocessing=True,
+			max_queue_size=12,
+			callbacks=callbacks,
 		)
 
 		return
 
-	def fit_lstm(self, epochs=10):
-
-		self.enable_3dcnn_lstm()
-
-		# self.model.fit(
-		# 	self.batch_generator,
-		# 	epochs=epochs,
-		#
-		# )
-
-		steps = len(self.batch_generator)
-
-		for epoch in range(epochs):
-
-			msg = ['']
-
-			with click.progressbar(
-					range(steps),
-					label='Training...',
-					show_eta=True,
-					show_percent=True,
-					item_show_func=lambda t: msg[0],
-			) as bar:
-
-				for step in bar:
-					batch_data, batch_labels = self.batch_generator[step]
-
-					info = self._train_step_lstm(batch_data, batch_labels)
-
-					memory_usage = get_memory_usage()
-					msg[0] = (
-						f'Epoch {epoch + 1}/{epochs} '
-						f'  Step {step + 1}/{steps} '
-						f'- Loss: {info["loss"]:.4f}'
-						f', Throw%: {info["accuracy_throw"]:.4f}'
-						f', Tori: {info["accuracy_tori"]:.4f}'
-						f', Memory: {memory_usage:.2f} MB'
-					)
-
-		return
-
-	def fit_model_breakdown(self, epochs=10):
-
-		self.enable_3dcnn()
-
-		# self.model.fit(
-		# 	self.batch_generator,
-		# 	epochs=epochs
-		# )
-
-		steps = len(self.batch_generator)
-
-		for epoch in range(epochs):
-
-			print(f"Epoch {epoch + 1}/{epochs}")
-
-			for step in range(steps):
-				x_batch, y_batch = self.batch_generator[step]
-				loss, accuracy = self.model.train_on_batch(x_batch, y_batch)
-
-				memory_usage = get_memory_usage()
-				log.info(
-					f"  Step {step + 1}/{steps} "
-					f"- Loss: {loss:.4f}"
-					f", Accuracy: {accuracy:.4f}"
-					f", Memory: {memory_usage:.2f} MB"
-				)
-
-				# Explicitly call garbage collection
-				del x_batch, y_batch
-				gc.collect()
-
-		return
-
 	@tf.function
-	def _train_step_lstm(self, batch_data: np.ndarray, batch_labels: np.ndarray) -> dict[str, tf.Tensor]:
+	def _train_step_rnn(self, batch_data: np.ndarray, batch_labels: np.ndarray) -> dict[str, tf.Tensor]:
 		# Get the number of throws for slicing
 		# Need to get this from the dataset handler, assuming it's accessible
 		num_throws = len(self.dataset.throw_classes)
