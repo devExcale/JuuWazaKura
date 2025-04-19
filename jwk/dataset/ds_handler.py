@@ -8,7 +8,7 @@ from typing import Generator, Hashable
 import cv2
 import numpy as np
 import pandas as pd
-from keras.api.utils import to_categorical
+from tensorflow.keras.utils import to_categorical
 
 from ..utils import MyEnv, get_logger, regex_ts, ts_to_sec
 

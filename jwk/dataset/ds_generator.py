@@ -3,7 +3,7 @@ from math import ceil
 
 import cv2
 import numpy as np
-from keras.api.utils import PyDataset
+from tensorflow.keras.utils import Sequence
 
 from .ds_handler import DatasetHandler
 from ..utils import get_logger, MyEnv
@@ -12,7 +12,7 @@ from ..utils import get_logger, MyEnv
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 
-class DatasetBatchGenerator(PyDataset):
+class DatasetBatchGenerator(Sequence):
 
 	def __init__(
 			self,
@@ -20,9 +20,6 @@ class DatasetBatchGenerator(PyDataset):
 			input_size: tuple[int, int],
 			fixed_frames: int | None = None,
 			window_frames: int | None = None,
-			workers: int = 1,
-			use_multiprocessing: bool = False,
-			max_queue_size: int = 10,
 			segments_per_batch: int = 8,
 	) -> None:
 		"""
@@ -32,13 +29,8 @@ class DatasetBatchGenerator(PyDataset):
 		:param input_size: Size (hxw) of the input frames.
 		:param fixed_frames: Number of frames to subsample from the video.
 		:param window_frames: Number of frames to use as a sliding window.
-		:param workers: Number of workers to use in multithreading or multiprocessing.
-		:param use_multiprocessing: Whether to use Python multiprocessing for parallelism.
-		:param max_queue_size: Maximum number of batches to keep in the queue when iterating over the dataset in a multithreaded or multiprocessed setting.
 		:param segments_per_batch: How many segments to load per batch. The final batch size will be (#segments) x (#transformations).
 		"""
-
-		super().__init__(workers, use_multiprocessing, max_queue_size)
 
 		self.segments_per_batch = segments_per_batch
 		""" Number of segments to load per batch. """

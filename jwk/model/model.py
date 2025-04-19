@@ -7,13 +7,12 @@ import click
 import numpy as np
 import psutil
 import tensorflow as tf
-from keras import Model, Input
-from keras.api import backend
-from keras.api.layers import Conv3D, MaxPooling3D, Flatten, Dense, Lambda, Concatenate, Reshape, GRU
-from keras.api.losses import CategoricalCrossentropy
-from keras.api.metrics import CategoricalAccuracy, Recall, Precision
-from keras.api.models import Sequential
-from keras.api.optimizers import Adam
+from tensorflow.keras import backend, Model, Input
+from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Lambda, Concatenate, Reshape, GRU
+from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.metrics import CategoricalAccuracy, Recall, Precision
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.optimizers import Adam
 
 from ..dataset.ds_generator import DatasetBatchGenerator
 from ..dataset.ds_handler import DatasetHandler
@@ -111,8 +110,6 @@ class JwkModel:
 			segments_per_batch=self.segments_per_batch,
 			input_size=self.target_size,
 			fixed_frames=self.target_frames,
-			workers=4,
-			use_multiprocessing=True,
 		)
 
 		return
@@ -161,8 +158,6 @@ class JwkModel:
 			segments_per_batch=self.segments_per_batch,
 			input_size=self.target_size,
 			fixed_frames=self.target_frames,
-			workers=4,
-			use_multiprocessing=True,
 		)
 
 		return
@@ -177,8 +172,6 @@ class JwkModel:
 			segments_per_batch=1,
 			input_size=self.target_size,
 			window_frames=self.frame_window,
-			workers=4,
-			use_multiprocessing=True,
 		)
 
 		num_throws = len(self.dataset.throw_classes)
@@ -243,8 +236,6 @@ class JwkModel:
 			segments_per_batch=1,
 			input_size=self.target_size,
 			window_frames=self.frame_window,
-			workers=4,
-			use_multiprocessing=True,
 		)
 
 		num_throws = len(self.dataset.throw_classes)
@@ -335,6 +326,8 @@ class JwkModel:
 		self.model.fit(
 			self.batch_generator,
 			epochs=epochs,
+			workers=4,
+			use_multiprocessing=True,
 		)
 
 		return
