@@ -26,16 +26,22 @@ def cmd_model() -> None:
 	default=10,
 	help='Number of epochs to train the model'
 )
-def cmd_train(epochs: int) -> None:
+@click.option(
+	'--model', '-m',
+	default=None,
+	help=f'Model to train: {JwkModel.models.keys()}'
+)
+def cmd_train(epochs: int, model: str) -> None:
 	"""
 	Train the model.
 
 	:param epochs: Number of epochs to train the model
+	:param model: Model type
 	"""
 
-	handler = JwkModel()
+	handler = JwkModel(model)
 	handler.fit_model(epochs=epochs)
-	handler.save_weights("model.weights.h5")
+	handler.save_weights("model.tf")
 
 	return
 

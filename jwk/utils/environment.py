@@ -56,6 +56,9 @@ class MyEnv:
 	preprocess_n_ymax: int = 5
 	""" Number of boxes lowest in the frame to keep during preprocessing, 0 to keep all. """
 
+	segments_per_batch: int = 1
+	""" Number of segments to load in a single batch, not including transformations. """
+
 	@classmethod
 	def log_level(cls) -> int:
 		"""
