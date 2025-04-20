@@ -287,6 +287,7 @@ class JwkModel:
 			segments_per_batch=self.segments_per_batch,
 			input_size=self.target_size,
 			window_frames=5,  # Not necessary, temp used for internal handling
+			halve_fps=True,
 		)
 
 		num_throws = len(self.dataset.throw_classes)

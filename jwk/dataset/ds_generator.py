@@ -21,6 +21,7 @@ class DatasetBatchGenerator(Sequence):
 			fixed_frames: int | None = None,
 			window_frames: int | None = None,
 			segments_per_batch: int = 8,
+			halve_fps: bool = False,
 	) -> None:
 		"""
 		``fixed_frames`` and ``window_frames`` are mutually exclusive.
@@ -46,6 +47,9 @@ class DatasetBatchGenerator(Sequence):
 
 		self.window_frames = window_frames
 		""" Number of frames to use as a sliding window. """
+
+		self.halve_fps = halve_fps
+		""" Whether to use half the framerate. """
 
 		if fixed_frames and window_frames:
 			raise ValueError("fixed_frames and window_frames are mutually exclusive.")
@@ -150,10 +154,9 @@ class DatasetBatchGenerator(Sequence):
 
 		return batch_data, (batch_throw, batch_tori)
 
-	@staticmethod
-	def frames_normalize(frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
+	def frames_normalize(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
 		"""
-		Normalize the pixel values between ``[0,1]``.
+		Normalize the pixel values between ``[0,1]`` and halve the framerate if specified.
 
 		:param frames: List or array of frames to normalize.
 		:return: Normalized frames as a numpy array.
@@ -162,7 +165,11 @@ class DatasetBatchGenerator(Sequence):
 		# Normalize frames
 		max_val = np.max(frames)
 		if max_val > 1:
-			frames = [frame / 255. for frame in frames]
+			frames = [
+				frame / 255.
+				for i, frame in enumerate(frames)
+				if i % 2 == 0 or not self.halve_fps
+			]
 
 		# Stack frames into a single array
 		data = np.stack(frames, axis=0).astype(np.float32)
