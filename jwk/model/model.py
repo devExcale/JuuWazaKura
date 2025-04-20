@@ -75,7 +75,8 @@ class JwkModel:
 
 	def fit_model(self, epochs=10):
 
-		self.enable_conv3d_gru()
+		if self.model is None:
+			raise ValueError('No model to train!')
 
 		# Early Stopping: Stop training if validation loss doesn't improve for 15 epochs
 		early_stopping = EarlyStopping(
