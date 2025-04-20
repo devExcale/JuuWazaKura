@@ -328,16 +328,16 @@ class JwkModel:
 		self.model.compile(
 			optimizer=self.optimizer,
 			loss={
-				'throw_softmax': self.loss_fn,
-				'tori_softmax': self.loss_fn
+				'throw': self.loss_fn,
+				'tori': self.loss_fn
 			},
 			metrics={
-				'throw_softmax': [self.accuracy_throw],
-				'tori_softmax': [self.accuracy_tori],
+				'throw': [self.accuracy_throw],
+				'tori': [self.accuracy_tori],
 			},
 			loss_weights={
-				'throw_softmax': 0.8,
-				'tori_softmax': 0.2,
+				'throw': 0.8,
+				'tori': 0.2,
 			},
 		)
 
