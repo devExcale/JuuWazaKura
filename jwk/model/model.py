@@ -6,7 +6,8 @@ import psutil
 import tensorflow as tf
 from tensorflow.keras import backend, Model, Input
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
-from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Lambda, Concatenate, Reshape, GRU
+from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Lambda, Concatenate, Reshape, GRU, \
+	MaxPooling2D, Conv2D, LSTM, Softmax
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.metrics import CategoricalAccuracy, Recall, Precision
 from tensorflow.keras.optimizers import Adam
@@ -272,6 +273,76 @@ class JwkModel:
 
 		return
 
+	def enable_2dcnn_lstm(self):
+		"""
+		Configures a 2D CNN + LSTM model for variable-length sequences in batches.
+		Applies 2D CNNs per frame, then processes the sequence with an LSTM.
+		"""
+
+		if self.model is not None:
+			raise AssertionError("There's another model already enabled.")
+
+		self.batch_generator = DatasetBatchGenerator(
+			dataset=self.dataset,
+			segments_per_batch=16,
+			input_size=self.target_size,
+			window_frames=5,  # Not necessary, temp used for internal handling
+		)
+
+		num_throws = len(self.dataset.throw_classes)
+		num_tori = len(self.dataset.tori_classes)
+
+		batch_shape = (None, None, *self.target_size, 3)
+		input_layer = tf.keras.Input(batch_shape=batch_shape)
+
+		cnn_block = tf.keras.Sequential([
+			Conv2D(32, (3, 3), activation='relu', padding='same'),
+			MaxPooling2D((2, 2)),
+
+			Conv2D(64, (3, 3), activation='relu', padding='same'),
+			MaxPooling2D((2, 2)),
+
+			Conv2D(128, (3, 3), activation='relu', padding='same'),
+
+			# Use GlobalAveragePooling2D to flatten spatial dimensions
+			tf.keras.layers.GlobalAveragePooling2D(),
+			# Or Flatten() if you prefer, potentially followed by a small Dense layer
+			# tf.keras.layers.Flatten(),
+			# tf.keras.layers.Dense(64, activation='relu')
+		])
+
+		features_sequence = tf.keras.layers.TimeDistributed(cnn_block)(input_layer)
+
+		layer = LSTM(units=128)(features_sequence)
+
+		layer = Dense(128, activation='relu')(layer)
+		layer = Dense(64, activation='relu')(layer)
+
+		layer_output_throw_logits = Dense(num_throws, activation='linear')(layer)
+		layer_output_tori_logits = Dense(num_tori, activation='linear')(layer)
+
+		layer_output_throw = Softmax(name='throw')(layer_output_throw_logits)
+		layer_output_tori = Softmax(name='tori')(layer_output_tori_logits)
+
+		self.model = tf.keras.Model(inputs=input_layer, outputs=[layer_output_throw, layer_output_tori])
+		self.model.compile(
+			optimizer=self.optimizer,
+			loss={
+				'throw_softmax': self.loss_fn,
+				'tori_softmax': self.loss_fn
+			},
+			metrics={
+				'throw_softmax': [self.accuracy_throw],
+				'tori_softmax': [self.accuracy_tori],
+			},
+			loss_weights={
+				'throw_softmax': 0.8,
+				'tori_softmax': 0.2,
+			},
+		)
+
+		return
+
 	def _layer_concatenate_softmax(self, layer_output: tf.Tensor) -> tf.Tensor:
 		"""
 		Apply softmax to the different outputs of the model.
@@ -312,6 +383,7 @@ class JwkModel:
 	models = {
 		'3dcnn': enable_3dcnn,
 		'3dcnn_gru': enable_conv3d_gru,
+		'2dcnn_lstm': enable_2dcnn_lstm,
 	}
 
 
