@@ -165,11 +165,11 @@ class DatasetBatchGenerator(Sequence):
 		# Normalize frames
 		max_val = np.max(frames)
 		if max_val > 1:
-			frames = [
-				frame / 255.
-				for i, frame in enumerate(frames)
-				if i % 2 == 0 or not self.halve_fps
-			]
+			frames = [frame / 255. for i, frame in enumerate(frames)]
+
+		if self.halve_fps:
+			# Halve the framerate by subsampling
+			frames = frames[::2]
 
 		# Stack frames into a single array
 		data = np.stack(frames, axis=0).astype(np.float32)
