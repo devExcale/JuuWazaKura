@@ -284,7 +284,7 @@ class JwkModel:
 
 		self.batch_generator = DatasetBatchGenerator(
 			dataset=self.dataset,
-			segments_per_batch=16,
+			segments_per_batch=self.segments_per_batch,
 			input_size=self.target_size,
 			window_frames=5,  # Not necessary, temp used for internal handling
 		)
