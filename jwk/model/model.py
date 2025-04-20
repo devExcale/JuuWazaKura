@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Callable
 
 import psutil
 import tensorflow as tf
@@ -56,6 +57,7 @@ class JwkModel:
 		self.recall = Recall(name='rec')
 		self.precision = Precision(name='prc')
 
+		enable_model: Callable[['JwkModel'], None] | None
 		enable_model = self.models.get(model_type, None)
 
 		if not enable_model:
@@ -67,7 +69,7 @@ class JwkModel:
 
 		self.batch_generator: DatasetBatchGenerator | None = None
 
-		enable_model()
+		enable_model(self)
 
 		return
 
