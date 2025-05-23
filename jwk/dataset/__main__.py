@@ -1,19 +1,27 @@
-import argparse
 import json
+
+import click
 
 from .ds_downloader import DatasetDownloader
 from .ds_handler import DatasetHandler
 from ..utils import MyEnv
 
-parser = argparse.ArgumentParser(description='Dataset')
-parser.add_argument(
-	'action',
-	choices=['stats', 'download', 'ytformats'],
-	help='Action to perform',
-)
+
+@click.group(name="ds")
+def cmd_dataset():
+	"""
+	Dataset command line interface.
+	"""
+
+	return
 
 
-def main_stats():
+@cmd_dataset.command(name="stats")
+def cmd_stats():
+	"""
+	Compute and display dataset statistics.
+	"""
+
 	# Initialize dataset
 	handler = DatasetHandler()
 
@@ -28,45 +36,41 @@ def main_stats():
 	stats = handler.compute_stats()
 
 	# Print statistics (beautify)
-	print(json.dumps(stats, indent=4))
+	click.echo(json.dumps(stats, indent=4))
 
 	# Print unknown throws
-	print('Unknown throws:', unknown_throws)
+	click.echo(f"Unknown throws: {unknown_throws}")
+
+	return
 
 
-def main_download():
+@cmd_dataset.command(name="download")
+def cmd_download():
+	"""
+	Download dataset segments asynchronously.
+	"""
+
 	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
 		downloader.download_segment_all_async()
 
 	return
 
 
-def main_ytformats():
-	formats: dict[str, str] = {}
+@cmd_dataset.command(name="ytformats")
+def cmd_ytformats():
+	"""
+	Display YouTube video formats for dataset videos.
+	"""
+	formats = {}
 
 	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
 		for yt_id in downloader.yt_video_ids.values():
 			formats[yt_id] = downloader.yt_find_format(yt_id)
 
-	print(json.dumps(formats, indent=4))
+	click.echo(json.dumps(formats, indent=4))
 
 	return
 
 
-def main():
-	switch = {
-		'stats': main_stats,
-		'download': main_download,
-		'ytformats': main_ytformats,
-	}
-
-	args = parser.parse_args()
-	main_method = switch.get(args.action, parser.print_help)
-
-	main_method()
-
-	return
-
-
-if __name__ == '__main__':
-	main()
+if __name__ == "__main__":
+	cmd_dataset()

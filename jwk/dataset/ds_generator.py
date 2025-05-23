@@ -152,7 +152,7 @@ class DatasetBatchGenerator(Sequence):
 			}
 			raise ValueError(f'Batch {batch_idx} wrongly shaped: {shapes}')
 
-		return batch_data, (batch_throw, batch_tori)
+		return batch_data.copy(), (batch_throw.copy(), batch_tori.copy())
 
 	def frames_normalize(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
 		"""

@@ -321,6 +321,8 @@ class DatasetHandler:
 			for column in self.stats_columns
 		}
 
+		stats['total'] = len(self.df)
+
 		return stats
 
 	def xy(self, index: Hashable, row: pd.Series | None = None) -> tuple[list[np.ndarray], str, str]:
