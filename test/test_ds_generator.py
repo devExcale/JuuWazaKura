@@ -19,7 +19,7 @@ class TestDatasetBatchGenerator(unittest.TestCase):
 		self.batch_generator = DatasetBatchGenerator(
 			dataset=self.dataset,
 			segments_per_batch=1,
-			input_size=(112, 112),
+			frame_size=(112, 112),
 			window_frames=8,
 			workers=4,
 			use_multiprocessing=True,

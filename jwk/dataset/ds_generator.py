@@ -17,52 +17,40 @@ class DatasetBatchGenerator(Sequence):
 	def __init__(
 			self,
 			dataset: DatasetHandler,
-			input_size: tuple[int, int],
-			fixed_frames: int | None = None,
-			window_frames: int | None = None,
-			segments_per_batch: int = 8,
-			halve_fps: bool = False,
+			frame_size: tuple[int, int],
+			frame_stride: int = 1,
 	) -> None:
 		"""
-		``fixed_frames`` and ``window_frames`` are mutually exclusive.
 
 		:param dataset: Finalized DatasetHandler.
-		:param input_size: Size (hxw) of the input frames.
-		:param fixed_frames: Number of frames to subsample from the video.
-		:param window_frames: Number of frames to use as a sliding window.
-		:param segments_per_batch: How many segments to load per batch. The final batch size will be (#segments) x (#transformations).
+		:param frame_size: Size (hxw) of the input frames.
+		:param frame_stride: Stride for subsampling frames.
 		"""
 
-		self.segments_per_batch = segments_per_batch
-		""" Number of segments to load per batch. """
+		self.frame_size = frame_size
+		""" Size of the input frames (H, W). """
 
-		self.batch_size = segments_per_batch * 2
-		""" Size of each batch. """
+		self.frame_stride = frame_stride
+		""" Stride for subsampling frames. """
 
-		self.input_size = input_size
-		""" Size of the input frames (HxW). """
+		self.batch_size = 1
+		""" Batch size for the generator. """
 
-		self.fixed_frames = fixed_frames
-		""" Number of frames to subsample from the video. """
-
-		self.window_frames = window_frames
-		""" Number of frames to use as a sliding window. """
-
-		self.halve_fps = halve_fps
-		""" Whether to use half the framerate. """
-
-		if fixed_frames and window_frames:
-			raise ValueError("fixed_frames and window_frames are mutually exclusive.")
-
-		if not fixed_frames and not window_frames:
-			raise ValueError("Either fixed_frames or window_frames must be set.")
+		self.input_shape = (1, None, *self.frame_size, 3)
+		""" Input shape of the model (B, T, H, W, C). """
 
 		# Load entire dataset straight away.
 		self.ds: DatasetHandler = dataset
 
+		self.transforms: list[callable] = [
+			self.transform_resize,
+			self.transform_resize_flip,
+		]
+		""" List of transformations to apply to the frames. """
+
 		log.debug(
-			f"Creating DatasetBatchGenerator with batch size {self.batch_size}, "
-			f"expecting {len(self)} batches for {len(self.ds.df) * 2} items"
+			f"Creating DatasetBatchGenerator with batch size {1}, "
+			f"expecting {len(self)} batches for {len(self.ds.df) * len(self.transforms)} items"
 		)
 
 		return
@@ -74,9 +62,9 @@ class DatasetBatchGenerator(Sequence):
 		:return: Number of batches.
 		"""
 
-		return ceil(len(self.ds.df) / self.segments_per_batch)
+		return len(self.ds.df) * len(self.transforms)
 
-	def __getitem__(self, batch_idx: int) -> tuple[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+	def __getitem__(self, batch_idx: int) -> tuple[np.ndarray, dict[str, np.ndarray]]:
 		"""
 		Get the batch at the given index.
 
@@ -86,59 +74,27 @@ class DatasetBatchGenerator(Sequence):
 
 		log.trace(f"Loading batch {batch_idx}")
 
-		start = batch_idx * self.segments_per_batch
-
-		# Cap upper bound at array length; the last batch may be smaller
-		# if the total number of items is not a multiple of batch size.
-		end = min(start + self.segments_per_batch, len(self.ds.df))
-
 		n_throws = len(self.ds.throw_classes)
 		n_tori = len(self.ds.tori_classes)
+		n_transforms = len(self.transforms)
+
+		idx_segment = batch_idx // n_transforms
+		idx_transform = batch_idx % n_transforms
 
 		list_data = []
 		labels_throw = []
 		labels_tori = []
 
-		normalization = self.frames_normalize_fixed_time if self.fixed_frames else self.frames_normalize
+		# Get segment
+		x, y = self.ds.xy_train(idx_segment, normalize_x=self.transform_normalize)
 
-		# Loop over requested segments
-		for idx in range(start, end):
-
-			# Get segments
-			x, y = self.ds.xy_train(idx, normalize_x=normalization)
-
-			# Apply transformations (resize and flip)
-			for morph_func in [self.frames_resize, self.frames_resize_flip]:
-				# noinspection PyArgumentList
-				list_data.append(morph_func(x))
-				labels_throw.append(y[:n_throws])
-				labels_tori.append(y[n_throws:])
+		list_data.append(self.transforms[idx_transform](x))
+		labels_throw.append(y[:n_throws])
+		labels_tori.append(y[n_throws:])
 
 		# Ensure videos have loaded
 		if len(list_data) == 0:
 			raise ValueError(f'Batch {batch_idx} is empty.')
-
-		# Variable length videos
-		if self.window_frames:
-
-			# Get max number of frames in a video
-			max_frames = max(len(x) for x in list_data)
-
-			# Pad all videos to the max number of frames
-			for i, vid_data in enumerate(list_data):
-				n_frames = len(vid_data)
-
-				if n_frames >= max_frames:
-					continue
-
-				# Apply padding
-				n_pad = max_frames - n_frames
-				list_data[i] = np.pad(
-					vid_data,
-					((0, n_pad), (0, 0), (0, 0), (0, 0)),
-					mode='constant',
-					constant_values=0
-				)
 
 		batch_data = np.array(list_data)
 		batch_throw = np.array(labels_throw)
@@ -152,9 +108,9 @@ class DatasetBatchGenerator(Sequence):
 			}
 			raise ValueError(f'Batch {batch_idx} wrongly shaped: {shapes}')
 
-		return batch_data.copy(), (batch_throw.copy(), batch_tori.copy())
+		return batch_data.copy(), {'throw': batch_throw.copy(), 'tori': batch_tori.copy()}
 
-	def frames_normalize(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
+	def transform_normalize(self, frames: np.ndarray) -> np.ndarray:
 		"""
 		Normalize the pixel values between ``[0,1]`` and halve the framerate if specified.
 
@@ -164,67 +120,35 @@ class DatasetBatchGenerator(Sequence):
 
 		# Normalize frames
 		max_val = np.max(frames)
+		frames = frames.astype(np.float32)
 		if max_val > 1:
-			frames = [frame / 255. for i, frame in enumerate(frames)]
+			frames /= 255.
 
-		if self.halve_fps:
-			# Halve the framerate by subsampling
-			frames = frames[::2]
+		# Subsample frames by the specified stride
+		if self.frame_stride != 1:
+			frames = frames[::self.frame_stride]
 
-		# Stack frames into a single array
-		data = np.stack(frames, axis=0).astype(np.float32)
+		return frames
 
-		return data
-
-	def frames_normalize_fixed_time(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
-		"""
-		Normalize the pixel values between ``[0,1]`` and ensure the number of frames is fixed by subsampling or padding.
-
-		:param frames:
-		:return:
-		"""
-
-		# Normalize frames
-		max_val = np.max(frames)
-		if max_val > 1:
-			frames = [frame / 255. for frame in frames]
-
-		# Normalize frame count
-		num_frames = len(frames)
-		if num_frames < self.fixed_frames:
-
-			num_padding = self.fixed_frames - num_frames
-			frames.extend([frames[-1]] * num_padding)
-
-		elif num_frames > self.fixed_frames:
-
-			indices = np.linspace(0, num_frames - 1, self.fixed_frames, dtype=int)
-			frames = [frames[i] for i in indices]
-
-		# Stack frames into a single array
-		data = np.stack(frames, axis=0).astype(np.float32)
-
-		return data
-
-	def frames_resize(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
+	def transform_resize(self, frames: np.ndarray) -> np.ndarray:
 		"""
 		Resize the frames to the specified input size.
 
-		:param frames: List or array of frames to resize.
+		:param frames: Array of frames to resize.
 		:return: Resized frames as a numpy array.
 		"""
 
-		if frames[0].shape[:2] != self.input_size:
+		if frames[0].shape[:2] != self.frame_size:
 			resized_frames = np.array([
-				cv2.resize(frame, self.input_size, interpolation=cv2.INTER_AREA)
+				cv2.resize(frame, self.frame_size, interpolation=cv2.INTER_AREA)
 				for frame in frames
 			])
 		else:
-			resized_frames = np.array(frames)
+			resized_frames = frames
 
 		return resized_frames
 
-	def frames_resize_flip(self, frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
+	def transform_resize_flip(self, frames: np.ndarray) -> np.ndarray:
 		"""
 		Resize and flip the frames.
 
@@ -234,13 +158,13 @@ class DatasetBatchGenerator(Sequence):
 
 		flipped_frames = np.array([
 			cv2.flip(frame, 1)
-			for frame in self.frames_resize(frames)
+			for frame in self.transform_resize(frames)
 		])
 
 		return flipped_frames
 
 	@staticmethod
-	def frames_flip(frames: list[np.ndarray] | np.ndarray) -> np.ndarray:
+	def frames_flip(frames: np.ndarray) -> np.ndarray:
 		"""
 		Flip the frames.
 

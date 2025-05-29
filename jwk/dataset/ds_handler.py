@@ -325,7 +325,7 @@ class DatasetHandler:
 
 		return stats
 
-	def xy(self, index: Hashable, row: pd.Series | None = None) -> tuple[list[np.ndarray], str, str]:
+	def xy(self, index: Hashable, row: pd.Series | None = None) -> tuple[np.ndarray, str, str]:
 
 		if row is None:
 			row = self.df.loc[index]
@@ -364,12 +364,12 @@ class DatasetHandler:
 		if not frames:
 			raise ValueError(f"Error loading video: {video_path}")
 
-		return frames, throw, tori
+		return np.array(frames), throw, tori
 
 	def xy_train(
 			self,
 			index: Hashable,
-			normalize_x: Callable[[list[np.ndarray]], np.ndarray]
+			normalize_x: Callable[[np.ndarray], np.ndarray]
 	) -> tuple[np.ndarray, np.ndarray]:
 		"""
 		Loads the video data and returns the processed data and labels.

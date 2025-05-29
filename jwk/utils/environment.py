@@ -59,6 +59,9 @@ class MyEnv:
 	segments_per_batch: int = 1
 	""" Number of segments to load in a single batch, not including transformations. """
 
+	tf_dump_debug_info: bool = False
+	""" Whether to enable TensorFlow ``tf.debugging.experimental.enable_dump_debug_info()``. """
+
 	@classmethod
 	def log_level(cls) -> int:
 		"""
