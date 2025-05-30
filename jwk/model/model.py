@@ -20,15 +20,12 @@ from ..dataset.ds_generator import DatasetBatchGenerator
 from ..dataset.ds_handler import DatasetHandler, normalize_label
 from ..utils import MyEnv, get_logger
 
-absl.logging.set_verbosity(absl.logging.ERROR)
+# absl.logging.set_verbosity(absl.logging.ERROR)
 
 # Initialize logging
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 keras.mixed_precision.set_global_policy('float32')
-
-for gpu in tf.config.experimental.list_physical_devices('GPU'):
-	tf.config.experimental.set_memory_growth(gpu, True)
 
 if MyEnv.tf_dump_debug_info:
 	tf.debugging.experimental.enable_dump_debug_info(
@@ -153,12 +150,12 @@ class JwkModel:
 		)
 
 		callbacks = [
-			early_stopping,
-			lr_scheduler,
+			# early_stopping,
+			# lr_scheduler,
 			# checkpoint,
 			# mem_cleanup,
-			tb_profile,
-			epoch_mem_usage
+			# tb_profile,
+			# epoch_mem_usage,
 		]
 
 		self.model.fit(
@@ -185,6 +182,7 @@ class JwkModel:
 			dataset=self.dataset,
 			frame_size=self.target_size,
 			frame_stride=3,
+			frame_stride_augment=True,
 		)
 
 		num_throws = len(self.dataset.throw_classes)

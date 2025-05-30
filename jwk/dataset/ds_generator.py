@@ -1,5 +1,4 @@
 import logging
-from math import ceil
 
 import cv2
 import numpy as np
@@ -19,12 +18,14 @@ class DatasetBatchGenerator(Sequence):
 			dataset: DatasetHandler,
 			frame_size: tuple[int, int],
 			frame_stride: int = 1,
+			frame_stride_augment: bool = False
 	) -> None:
 		"""
 
 		:param dataset: Finalized DatasetHandler.
 		:param frame_size: Size (hxw) of the input frames.
 		:param frame_stride: Stride for subsampling frames.
+		:param frame_stride_augment: TODO
 		"""
 
 		self.frame_size = frame_size
@@ -32,6 +33,9 @@ class DatasetBatchGenerator(Sequence):
 
 		self.frame_stride = frame_stride
 		""" Stride for subsampling frames. """
+
+		self.frame_stride_augment = frame_stride_augment and frame_stride > 1
+		""" TODO """
 
 		self.batch_size = 1
 		""" Batch size for the generator. """
@@ -62,7 +66,9 @@ class DatasetBatchGenerator(Sequence):
 		:return: Number of batches.
 		"""
 
-		return len(self.ds.df) * len(self.transforms)
+		n_stride_aug = self.frame_stride if self.frame_stride_augment else 1
+
+		return len(self.ds.df) * len(self.transforms) * n_stride_aug
 
 	def __getitem__(self, batch_idx: int) -> tuple[np.ndarray, dict[str, np.ndarray]]:
 		"""
@@ -77,16 +83,18 @@ class DatasetBatchGenerator(Sequence):
 		n_throws = len(self.ds.throw_classes)
 		n_tori = len(self.ds.tori_classes)
 		n_transforms = len(self.transforms)
+		n_stride = self.frame_stride if self.frame_stride_augment else 1
 
-		idx_segment = batch_idx // n_transforms
-		idx_transform = batch_idx % n_transforms
+		idx_segment = batch_idx // (n_transforms * n_stride)
+		idx_transform = batch_idx % (n_transforms * n_stride) // n_stride
+		idx_stride = batch_idx % n_stride
 
 		list_data = []
 		labels_throw = []
 		labels_tori = []
 
 		# Get segment
-		x, y = self.ds.xy_train(idx_segment, normalize_x=self.transform_normalize)
+		x, y = self.ds.xy_train(idx_segment, normalize_x=lambda frames: self.transform_normalize(frames, idx_stride))
 
 		list_data.append(self.transforms[idx_transform](x))
 		labels_throw.append(y[:n_throws])
@@ -110,11 +118,12 @@ class DatasetBatchGenerator(Sequence):
 
 		return batch_data.copy(), {'throw': batch_throw.copy(), 'tori': batch_tori.copy()}
 
-	def transform_normalize(self, frames: np.ndarray) -> np.ndarray:
+	def transform_normalize(self, frames: np.ndarray, stride_offset: int = 0) -> np.ndarray:
 		"""
 		Normalize the pixel values between ``[0,1]`` and halve the framerate if specified.
 
 		:param frames: List or array of frames to normalize.
+		:param stride_offset: Offset for the frame stride, default is ``0``.
 		:return: Normalized frames as a numpy array.
 		"""
 
@@ -126,7 +135,7 @@ class DatasetBatchGenerator(Sequence):
 
 		# Subsample frames by the specified stride
 		if self.frame_stride != 1:
-			frames = frames[::self.frame_stride]
+			frames = frames[stride_offset::self.frame_stride]
 
 		return frames
 
