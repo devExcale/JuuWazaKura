@@ -32,7 +32,7 @@ def cmd_clipper():
 	'save_dir',
 	type=str,
 	default='',
-	help='Output directory, defaults to the current directory'
+	help='Output directory where to directly store the clips, defaults to the current directory'
 )
 @click.option(
 	'--name', '-n',
@@ -101,8 +101,8 @@ def cmd_extract(
 		output_size = None
 
 	with Clipper(
-			input_filepath=video_path,
-			savedir=save_dir,
+			path_source=video_path,
+			dir_output=save_dir,
 			name=name,
 			size=output_size,
 			default_ms_end=default_ms_end,

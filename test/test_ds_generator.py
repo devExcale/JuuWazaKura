@@ -1,7 +1,7 @@
 import logging
 import unittest
 
-from jwk.dataset import DatasetHandler, DatasetBatchGenerator
+from jwk.dataset import DatasetOrchestrator, DatasetBatchGenerator
 from jwk.utils import MyEnv, get_logger
 
 # Initialize logging
@@ -11,8 +11,8 @@ log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 class TestDatasetBatchGenerator(unittest.TestCase):
 
 	def setUp(self):
-		self.dataset = DatasetHandler()
-		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.dataset_include), set(MyEnv.dataset_exclude))
+		self.dataset = DatasetOrchestrator()
+		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.livefootage_include), set(MyEnv.livefootage_exclude))
 		self.dataset.finalize()
 
 		# Initialize DatasetBatchGenerator

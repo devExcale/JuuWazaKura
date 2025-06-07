@@ -15,7 +15,7 @@ from ..utils import MyEnv, get_logger, regex_ts, ts_to_sec
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 
-class DatasetHandler:
+class DatasetOrchestrator:
 
 	def __init__(self) -> None:
 
@@ -54,6 +54,9 @@ class DatasetHandler:
 
 		self.default_ms_end: int = 0
 		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
+
+		self.filters: list[Callable[[pd.Series], bool]] = []
+		""" Filter to apply during finalization. """
 
 		self.finalized: bool = False
 
@@ -95,7 +98,7 @@ class DatasetHandler:
 
 		return
 
-	def __finalize_barrier__(self) -> None:
+	def __barrier_finalized__(self) -> None:
 		"""
 		Checks whether the data is finalized, and raises an error if it is.
 		"""
@@ -121,7 +124,7 @@ class DatasetHandler:
 		:param exclude: Set of filenames to exclude from the files to load.
 		"""
 
-		self.__finalize_barrier__()
+		self.__barrier_finalized__()
 
 		# Include overrides exclude
 		if include:
@@ -165,7 +168,7 @@ class DatasetHandler:
 		:param concat_list: List
 		"""
 
-		self.__finalize_barrier__()
+		self.__barrier_finalized__()
 
 		# Read the CSV file
 		loaded_df = pd.read_csv(
@@ -188,6 +191,22 @@ class DatasetHandler:
 			self.df = pd.concat([self.df, loaded_df], ignore_index=True)
 		else:
 			concat_list.append(loaded_df)
+
+		return
+
+	def filter(self, predicate: Callable[[pd.Series], bool]) -> None:
+		"""
+		Filters the dataset using a predicate function.
+		The filter will be applied to each row of the DataFrame during the finalization step.
+
+		:param predicate: Function that takes a row and returns True if it should be kept.
+		"""
+
+		# Check if already finalized
+		self.__barrier_finalized__()
+
+		# Add predicate
+		self.filters.append(predicate)
 
 		return
 
@@ -247,13 +266,15 @@ class DatasetHandler:
 
 		return
 
-	def __finalize_row__(self, index: Hashable, row: pd.Series) -> None:
+	def __finalize_row__(self, index: Hashable, row: pd.Series) -> bool:
 		"""
-		Performs final checks on a row of the dataset and morphs it if necessary.
+		Performs final checks on a row of the dataset and applies the needed transformations.
+		Filter predicates are applied after the row has been transformed:
+		if the row should be kept this function will return ``True``, otherwise ``False``.
 
 		:param index: Index of the row.
 		:param row: Row data.
-		:return: ``None``
+		:return: ``True`` if the row should be kept, ``False`` otherwise.
 		"""
 
 		# Get fields
@@ -297,7 +318,12 @@ class DatasetHandler:
 		# Update the row
 		self.df.at[index, 'throw'] = throw
 
-		return
+		# Apply filters
+		for predicate in self.filters:
+			if not predicate(row):
+				return False
+
+		return True
 
 	def get_unknown_throws(self) -> set[str]:
 		"""
@@ -343,7 +369,7 @@ class DatasetHandler:
 		# Get video path
 		ms_start = int(ts_to_sec(ts_start) * 1000)
 		clip_name = f'{competition}-{ms_start}.mp4'
-		video_path = os.path.join(MyEnv.dataset_preproc, competition, clip_name)
+		video_path = os.path.join(MyEnv.dataset_inputready, competition, clip_name)
 
 		log.trace(f"Loading video: {video_path}")
 

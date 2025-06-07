@@ -29,19 +29,20 @@ class MyEnv:
 	dataset_source: str = os.path.join(os.getcwd(), 'dataset')
 	""" Path to the folder containing the csv files. """
 
-	dataset_clips: str = os.path.join(os.getcwd(), 'dataset', 'clips')
-	""" Path to the folder containing the video clips. """
+	dataset_livefootage: str = os.path.join(os.getcwd(), 'dataset', 'livefootage')
+	""" Path to the directory containing the live-footage video files. """
 
-	dataset_preproc: str = os.path.join(os.getcwd(), 'dataset', 'pre')
-	""" Path to the folder containing the video clips. """
+	dataset_segments: str = os.path.join(os.getcwd(), 'dataset', 'segments')
+	""" Path to the directory containing the folders for the respective live-footage segments. """
 
-	dataset_windows: str = os.path.join(os.getcwd(), 'dataset', 'win')
-	""" Path to the folder containing the video clips. """
+	dataset_inputready: str = os.path.join(os.getcwd(), 'dataset', 'inputready')
+	""" Path to the directory containing the folders for the respective live-footage segments,
+		preprocessed and ready for input. """
 
-	dataset_include: List[str] = []
-	""" Subset of the dataset to include (dataset id). Empty list includes all. """
+	livefootage_include: List[str] = []
+	""" Subset of the competitions to include (competition id). Empty list includes all. """
 
-	dataset_exclude: List[str] = []
+	livefootage_exclude: List[str] = []
 	""" Subset of the dataset to include (dataset id). Empty list includes all. """
 
 	delete_yt: bool = True

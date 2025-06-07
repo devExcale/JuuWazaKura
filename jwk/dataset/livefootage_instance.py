@@ -3,43 +3,43 @@ from re import match
 
 from ..utils import ts_to_sec
 
-from .ds_handler import DatasetHandler
+from .ds_orchestrator import DatasetOrchestrator
 
 
-class DatasetInstance:
+class LiveFootageInstance:
 
-	def __init__(self, competition: str, dir_dataset: str, dir_segments: str) -> None:
+	def __init__(self, code_footage: str, dir_dataset: str, dir_segments: str) -> None:
 		"""
-		Utility class to check the status of a dataset.
+		Utility class to check the status of live-footage.
 
-		:param competition: Name of the competition.
-		:param dir_dataset: Path to the dataset directory.
-		:param dir_segments: Path to the segments directory.
+		:param code_footage: Live-footage's code.
+		:param dir_dataset: Path to the dataset (csv) directory.
+		:param dir_segments: Path to the segments (mp4) directory.
 		"""
 
-		self.competition: str = competition
-		""" Name of the competition. """
+		self.code_footage: str = code_footage
+		""" Code of the live-footage. """
 
 		self.dir_dataset: str = dir_dataset
-		""" Path to the dataset directory. """
+		""" Path to the dataset directory containing the csv files. """
 
 		self.dir_segments: str = dir_segments
-		""" Path to the segments directory. """
+		""" Path to the dataset directory containing the segment folders. """
 
-		self.path_csv = os.path.join(self.dir_dataset, f'{self.competition}.csv')
+		self.dir_segments_footage = os.path.join(self.dir_segments, self.code_footage)
+		""" Path to the directory containing the footage's segments. """
+
+		self.path_csv = os.path.join(self.dir_dataset, f'{self.code_footage}.csv')
 		""" Path to the CSV file of the dataset. """
 
-		self.path_video = os.path.join(self.dir_segments, f'{self.competition}.mp4')
-		""" Path to the video file of the dataset. """
+		self.path_video = os.path.join(self.dir_segments, f'{self.code_footage}.mp4')
+		""" Path to the video file of the footage. """
 
 		self.detected_segments: set[int] = set()
-		""" The detected segments of the video. """
-
-		self.dir_competition = os.path.join(self.dir_segments, self.competition)
-		""" Path to the competition folder in the segments directory. """
+		""" Set of the segments detected in the footage. """
 
 		if self.is_dir_competition_present():
-			regex_segment_filename = rf'^{self.competition}-(\d+)\.mp4$'
+			regex_segment_filename = rf'^{self.code_footage}-(\d+)\.mp4$'
 
 			self.detected_segments = set(
 				map(
@@ -51,14 +51,14 @@ class DatasetInstance:
 						map(
 							# Map filenames to regex match objects
 							lambda filename: match(regex_segment_filename, filename),
-							os.listdir(self.dir_competition)
+							os.listdir(self.dir_segments)
 						)
 					)
 				)
 			)
 
-		self.ds_handler: DatasetHandler | None = None
-		""" DatasetHandler instance for the dataset. """
+		self.ds_orch: DatasetOrchestrator | None = None
+		""" Orchestrator with the footage's data. """
 
 		return
 
@@ -87,11 +87,11 @@ class DatasetInstance:
 		:return: Whether the competition folder is present.
 		"""
 
-		return os.path.exists(self.dir_competition)
+		return os.path.exists(self.dir_segments)
 
-	def validate_dataset(self) -> None:
+	def load_dataset(self) -> None:
 		"""
-		Validates the dataset instance.
+		Load the footage's data from the CSV file.
 
 		:raise FileNotFoundError: If the CSV file is not found.
 		:raise ValueError: If the dataset data is not valid.
@@ -101,18 +101,18 @@ class DatasetInstance:
 		if not self.is_csv_present():
 			raise FileNotFoundError(f"CSV file not found: {self.path_csv}")
 
-		if self.ds_handler is None:
-			self.ds_handler = DatasetHandler()
-			self.ds_handler.load(self.path_csv)
+		if self.ds_orch is None:
+			self.ds_orch = DatasetOrchestrator()
+			self.ds_orch.load(self.path_csv)
 
-		self.ds_handler.finalize()
+		self.ds_orch.finalize()
 
 		return
 
 	def missing_segments(self) -> set[int]:
 		"""
-		Returns a set with the segments that are found in the dataset but not in the segments directory.
-		The set contents are the milliseconds of the start of the segments.
+		Returns a set with the segments that are found in the dataset but not in the footage's segments directory.
+		The set contents are the milliseconds the segments' start timestamps.
 
 		:raise FileNotFoundError: If the CSV file is not found.
 		:raise ValueError: If the dataset data is not valid.
@@ -123,10 +123,10 @@ class DatasetInstance:
 			raise FileNotFoundError(f"CSV file not found: {self.path_csv}")
 
 		# Ensure dataset is loaded and valid
-		self.validate_dataset()
+		self.load_dataset()
 
 		# Get all the throws start frames
-		ds_segments = set(map(lambda t: int(ts_to_sec(t) * 1000), self.ds_handler.df['ts_start']))
+		ds_segments = set(map(lambda t: int(ts_to_sec(t) * 1000), self.ds_orch.df['ts_start']))
 
 		# Return the difference between the dataset and the detected segments
 		return ds_segments - self.detected_segments

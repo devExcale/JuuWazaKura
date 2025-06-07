@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from tensorflow.keras.utils import Sequence
 
-from .ds_handler import DatasetHandler
+from .ds_orchestrator import DatasetOrchestrator
 from ..utils import get_logger, MyEnv
 
 # Initialize logging
@@ -15,7 +15,7 @@ class DatasetBatchGenerator(Sequence):
 
 	def __init__(
 			self,
-			dataset: DatasetHandler,
+			dataset: DatasetOrchestrator,
 			frame_size: tuple[int, int],
 			frame_stride: int = 1,
 			frame_stride_augment: bool = False
@@ -44,7 +44,7 @@ class DatasetBatchGenerator(Sequence):
 		""" Input shape of the model (B, T, H, W, C). """
 
 		# Load entire dataset straight away.
-		self.ds: DatasetHandler = dataset
+		self.ds: DatasetOrchestrator = dataset
 
 		self.transforms: list[callable] = [
 			self.transform_resize,

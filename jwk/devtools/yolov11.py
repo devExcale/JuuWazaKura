@@ -182,7 +182,7 @@ def boxes_intersects(boxes: list[FrameBox], scores: list[float], i: int) -> 'Fra
 
 def annotate_competition_segments(model: str, competition: str) -> None:
 	# List competition segments
-	parent_segments: str = MyEnv.dataset_clips
+	parent_segments: str = MyEnv.dataset_segments
 	segments: list[str] = os.listdir(os.path.join(parent_segments, competition))
 
 	# Check output directory
@@ -203,7 +203,7 @@ def annotate_competition_segments(model: str, competition: str) -> None:
 
 def apply_filter(competition: str) -> None:
 	# List competition segments
-	parent_segments: str = MyEnv.dataset_clips
+	parent_segments: str = MyEnv.dataset_segments
 	segments: list[str] = os.listdir(os.path.join(parent_segments, competition))
 
 	# Check output directory

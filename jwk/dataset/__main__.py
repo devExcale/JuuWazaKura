@@ -3,7 +3,7 @@ import json
 import click
 
 from .ds_downloader import DatasetDownloader
-from .ds_handler import DatasetHandler
+from .ds_orchestrator import DatasetOrchestrator
 from ..utils import MyEnv
 
 
@@ -23,7 +23,7 @@ def cmd_stats():
 	"""
 
 	# Initialize dataset
-	handler = DatasetHandler()
+	handler = DatasetOrchestrator()
 
 	# Load all the data
 	handler.load_all(MyEnv.dataset_source)
@@ -50,7 +50,7 @@ def cmd_download():
 	Download dataset segments asynchronously.
 	"""
 
-	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
+	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_livefootage, MyEnv.dataset_segments) as downloader:
 		downloader.download_segment_all_async()
 
 	return
@@ -63,7 +63,7 @@ def cmd_ytformats():
 	"""
 	formats = {}
 
-	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_clips) as downloader:
+	with DatasetDownloader(MyEnv.dataset_source, MyEnv.dataset_livefootage, MyEnv.dataset_segments) as downloader:
 		for yt_id in downloader.yt_video_ids.values():
 			formats[yt_id] = downloader.yt_find_format(yt_id)
 

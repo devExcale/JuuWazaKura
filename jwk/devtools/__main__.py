@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from .gipick import main_picker, main_export
-from .yolov11 import annotate_competition_segments, apply_filter
+from .yolov11 import annotate_competition_segments, apply_filter, video_annotate_objects
 from ..model import FrameBox
 from ..utils import MyEnv
 
@@ -131,7 +131,7 @@ def cmd_gi_export() -> None:
 	Export gi images.
 	"""
 
-	ds_folder = os.path.join(MyEnv.dataset_clips, 'TLIG2202D1T3')
+	ds_folder = os.path.join(MyEnv.dataset_segments, 'TLIG2202D1T3')
 	gi_folder = os.path.join(MyEnv.dataset_source, 'gi')
 	main_export(ds_folder, gi_folder, 'yolo11s.pt')
 
@@ -145,6 +145,32 @@ def cmd_yolov11() -> None:
 	"""
 
 	annotate_competition_segments('yolo11s.pt', 'LIG2202D1T3')
+
+	return
+
+
+@cmd_devtools.command(name='annotate')
+@click.option(
+	'--input', '-i', 'input_',
+	required=True,
+	help='Path to the video file to annotate.'
+)
+@click.option(
+	'--output', '-o',
+	required=True,
+	help='Path to the output video file with annotations.'
+)
+def cmd_annotate(
+		input_: str,
+		output: str,
+) -> None:
+	"""
+	Annotate competition segments with YOLOv11.
+
+	:return: ``None``
+	"""
+
+	video_annotate_objects(MyEnv.yolo_model, input_, output)
 
 	return
 

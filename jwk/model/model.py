@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Callable
 
 # noinspection PyPackageRequirements
-import absl.logging
 import keras.mixed_precision
 import psutil
 import tensorflow as tf
@@ -17,7 +16,7 @@ from tensorflow_addons.optimizers import AdamW
 from .arch.cnn2d_rnn import CNN2DRNN
 from .keras_callbacks import MemoryCleanupCallback
 from ..dataset.ds_generator import DatasetBatchGenerator
-from ..dataset.ds_handler import DatasetHandler, normalize_label
+from ..dataset.ds_orchestrator import DatasetOrchestrator
 from ..utils import MyEnv, get_logger
 
 # absl.logging.set_verbosity(absl.logging.ERROR)
@@ -46,8 +45,8 @@ class JwkModel:
 		:param model_type: Code of the model to enable.
 		"""
 
-		self.dataset: DatasetHandler = DatasetHandler()
-		""" Dataset handler object. """
+		self.dataset: DatasetOrchestrator = DatasetOrchestrator()
+		""" Dataset orchestrator object. """
 
 		self.target_size: tuple[int, int] = (64, 64)
 		""" Target size of the input frames. """
@@ -73,7 +72,11 @@ class JwkModel:
 		if not enable_model:
 			raise ValueError(f'No model {model_type} found.')
 
-		keeplist = [
+		# Load entire dataset (csv records)
+		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.livefootage_include), set(MyEnv.livefootage_exclude))
+
+		# Filter dataset
+		self.dataset.filter(lambda row: row['throw'] in [
 			"seoi_nage",
 			"uchi_mata",
 			"sode_tsurikomi_goshi",
@@ -84,20 +87,9 @@ class JwkModel:
 			# "ko_soto_gari",
 			# "morote_seoi_nage",
 			# "tani_otoshi",
-		]
+		])
 
-		# Load entire dataset (csv records)
-		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.dataset_include), set(MyEnv.dataset_exclude))
-
-		df = self.dataset.df
-		df.drop(df[
-					~df['throw']
-				.map(normalize_label)
-				.map(lambda t: self.dataset.throw_from_alias.get(t, t))
-				.map(lambda t: self.dataset.throw_to_group.get(t, t))
-				.isin(keeplist)
-				].index, inplace=True)
-		df.reset_index(drop=True, inplace=True)
+		# Lock dataset
 		self.dataset.finalize()
 
 		self.batch_generator: DatasetBatchGenerator | None = None

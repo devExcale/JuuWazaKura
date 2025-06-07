@@ -18,8 +18,8 @@ class Clipper:
 
 	def __init__(
 			self,
-			input_filepath: str,
-			savedir: str,
+			path_source: str,
+			dir_output: str,
 			name: str,
 			size: Optional[Tuple[int, int]] = None,
 			default_ms_end: int = 0,
@@ -27,28 +27,25 @@ class Clipper:
 		"""
 		Initializes the Clipper object with the video file path.
 
-		:param input_filepath: Path to the video file
-		:param savedir: Directory where the output clips will be saved
-		:param name: Prefix for the output clips
+		:param path_source: Path to the input video file.
+		:param dir_output: Directory where the output clips will be saved.
+		:param name: Prefix for the output clips.
 		:param size: Size of the output clips as a tuple (width, height).
 			If ``None``, the clips will be saved in the original size of the video.
 		:param default_ms_end: Default milliseconds to add to the end timestamp if no milliseconds are provided.
 		"""
 
-		self.input_filepath = input_filepath
+		self.path_source = path_source
 		""" Path to the input video file. """
 
-		self.root_dir = savedir
-		""" Root directory for saving the clips. """
+		self.dir_output = dir_output
+		""" Directory where the output clips will be saved. """
 
 		self.name = name
 		""" Prefix for the output clips. """
 
 		self.output_size = size
 		""" Size of the output clips as a tuple (width, height). """
-
-		self.output_dir = os.path.join(self.root_dir, self.name)
-		""" Directory where the output clips will be saved. """
 
 		self.default_ms_end = default_ms_end
 		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
@@ -75,11 +72,11 @@ class Clipper:
 		"""
 
 		# Open video file
-		cap = cv2.VideoCapture(self.input_filepath)
+		cap = cv2.VideoCapture(self.path_source)
 
 		# Test if the video file is opened successfully
 		if not cap.isOpened():
-			raise FileNotFoundError(f"Could not open video file at path: {self.input_filepath}")
+			raise FileNotFoundError(f"Could not open video file at path: {self.path_source}")
 
 		self.cap = cap
 
@@ -102,10 +99,10 @@ class Clipper:
 		log.debug(f"Output size: {self.output_size}")
 
 		# Create the output directory
-		if not os.path.exists(self.output_dir):
-			os.makedirs(self.output_dir)
+		if not os.path.exists(self.dir_output):
+			os.makedirs(self.dir_output)
 
-		log.debug(f"Output directory: {self.output_dir}")
+		log.debug(f"Output directory: {self.dir_output}")
 
 		return self
 
@@ -140,7 +137,7 @@ class Clipper:
 			raise ValueError(f"Start frame must be before the end frame: {self.name}/{ms_start}-{ms_end}")
 
 		clip_name = f"{self.name}-{ms_start}.mp4"
-		clip_path = os.path.join(self.output_dir, clip_name)
+		clip_path = os.path.join(self.dir_output, clip_name)
 
 		# Check if clip was already exported
 		if os.path.exists(clip_path):

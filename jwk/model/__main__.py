@@ -65,14 +65,14 @@ def cmd_preprocess(input_: str, output: str) -> None:
 	:param output: Path to the output folder
 	"""
 
-	if not input_ or not output:
-		raise ValueError('Input and output paths are required.')
+	if not input_:
+		raise ValueError('Input path is required.')
 
 	if input_ == '*':
 		sets = {
 			folder
-			for folder in os.listdir(MyEnv.dataset_clips)
-			if os.path.isdir(os.path.join(MyEnv.dataset_clips, folder))
+			for folder in os.listdir(MyEnv.dataset_segments)
+			if os.path.isdir(os.path.join(MyEnv.dataset_segments, folder))
 		}
 	else:
 		sets = {input_}
@@ -80,9 +80,9 @@ def cmd_preprocess(input_: str, output: str) -> None:
 	pathjoin = os.path.join
 
 	videos = {
-		pathjoin(MyEnv.dataset_clips, folder, filename): pathjoin(MyEnv.dataset_source, output, folder, filename)
+		pathjoin(MyEnv.dataset_segments, folder, filename): pathjoin(MyEnv.dataset_inputready, folder, filename)
 		for folder in sets
-		for filename in os.listdir(os.path.join(MyEnv.dataset_clips, folder))
+		for filename in os.listdir(os.path.join(MyEnv.dataset_segments, folder))
 		if filename.endswith('.mp4')
 	}
 

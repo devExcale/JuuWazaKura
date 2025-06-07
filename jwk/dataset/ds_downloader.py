@@ -6,7 +6,7 @@ from queue import Queue
 
 from yt_dlp import YoutubeDL
 
-from .ds_instance import DatasetInstance
+from .livefootage_instance import LiveFootageInstance
 from ..clipper import Clipper
 from ..utils import MyEnv, get_logger
 
@@ -16,19 +16,26 @@ log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
 class DatasetDownloader:
 
-	def __init__(self, dir_dataset: str, dir_segments: str) -> None:
+	def __init__(self, dir_dataset: str, dir_livefootage: str, dir_segments: str) -> None:
 		"""
 		Constructor for the DatasetDownloader class.
+
+		:param dir_dataset: Directory where the dataset (CSV files) is stored
+		:param dir_livefootage: Directory where the live-footage videos are stored
+		:param dir_segments: Directory where the segments (clipped videos) are stored
 		"""
 
 		self.dir_dataset: str = dir_dataset
-		""" Directory where the dataset is stored """
+		""" Directory where the dataset (CSV files) is stored """
+
+		self.dir_livefootage: str = dir_livefootage
+		""" Directory where the live-footage videos are stored """
 
 		self.dir_segments: str = dir_segments
-		""" Directory where the segments are stored """
+		""" Directory where the segments (clipped videos) are stored """
 
-		self.rm_clip_source: bool = MyEnv.delete_yt
-		""" Whether to remove the source video after clipping """
+		self.rm_livefootage: bool = MyEnv.delete_yt
+		""" Whether to remove the source live-footage video after clipping """
 
 		self.yt_format: dict[str, int | str] = {}
 		""" YouTube video format (width, height, fps, ext), loaded on enter """
@@ -36,10 +43,10 @@ class DatasetDownloader:
 		self.yt_video_ids: dict[str, str] = {}
 		""" YouTube video Name:IDs, loaded on enter """
 
-		self.queue_yt: Queue[DatasetInstance | None] = Queue()
+		self.queue_yt: Queue[LiveFootageInstance | None] = Queue()
 		""" Queue for YouTube consumer """
 
-		self.queue_clip: Queue[DatasetInstance | None] = Queue()
+		self.queue_clip: Queue[LiveFootageInstance | None] = Queue()
 		""" Queue for Clipper consumer """
 
 		return
@@ -51,7 +58,7 @@ class DatasetDownloader:
 		"""
 
 		# Ensure dataset directory exists
-		if not os.path.exists(self.dir_dataset):
+		if not os.path.exists(self.dir_dataset) or not os.path.isdir(self.dir_dataset):
 			raise FileNotFoundError(f'Dataset directory not found: {self.dir_dataset}')
 
 		log.debug(f'Dataset directory: {self.dir_dataset}')
@@ -65,7 +72,7 @@ class DatasetDownloader:
 		self.yt_video_ids = {
 			k: v
 			for k, v in ds['vidIds'].items()
-			if not MyEnv.dataset_include or k in MyEnv.dataset_include
+			if not MyEnv.livefootage_include or k in MyEnv.livefootage_include
 		}
 
 		return self
@@ -89,14 +96,14 @@ class DatasetDownloader:
 			return False
 
 		# Check whether the video already exists
-		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
+		path_video = os.path.join(self.dir_livefootage, f'{name}.mp4')
 		if os.path.exists(path_video):
 			log.info(f'Skipping {name} as the video already exists')
 			return True
 
 		# Create the yt-dlp options
 		ydl_opts = {
-			'outtmpl': os.path.join(self.dir_segments, f'{name}.%(ext)s'),
+			'outtmpl': os.path.join(self.dir_livefootage, f'{name}.%(ext)s'),
 			'format': self.yt_find_format(yt_id),
 			'quiet': True,
 			'noprogress': True,
@@ -146,15 +153,15 @@ class DatasetDownloader:
 		"""
 
 		# Check whether the video exists
-		path_video = os.path.join(self.dir_segments, f'{name}.mp4')
+		path_video = os.path.join(self.dir_livefootage, f'{name}.mp4')
 		if not os.path.exists(path_video):
 			log.warning(f'Skipping {name} as the video does not exist')
 			return
 
 		# Segment the video
 		clipper = Clipper(
-			input_filepath=path_video,
-			savedir=self.dir_segments,
+			path_source=path_video,
+			dir_output=os.path.join(self.dir_segments, name),
 			name=name,
 		)
 
@@ -162,7 +169,7 @@ class DatasetDownloader:
 			c.export_from_csv(os.path.join(self.dir_dataset, f'{name}.csv'))
 
 		# Delete file on finish
-		if self.rm_clip_source:
+		if self.rm_livefootage:
 			os.remove(path_video)
 
 		return
@@ -189,12 +196,12 @@ class DatasetDownloader:
 		for competition in self.yt_video_ids:
 			try:
 
-				ds = DatasetInstance(
-					competition=competition,
+				ds = LiveFootageInstance(
+					code_footage=competition,
 					dir_dataset=self.dir_dataset,
 					dir_segments=self.dir_segments,
 				)
-				ds.validate_dataset()
+				ds.load_dataset()
 				todo_yt.append(ds)
 
 			except Exception as e:
@@ -211,29 +218,29 @@ class DatasetDownloader:
 			try:
 
 				# Get YouTube id
-				yt_id = self.yt_video_ids[ds.competition]
+				yt_id = self.yt_video_ids[ds.code_footage]
 
 				# Skip download: no csv
 				if not ds.is_csv_present():
-					log.warning(f'(YouTube {i}/{n_todownload}) {ds.competition}: Skipping, CSV not found')
+					log.warning(f'(YouTube {i}/{n_todownload}) {ds.code_footage}: Skipping, CSV not found')
 					continue
 
 				# Skip download: video present or segments present (send to clipper)
 				if ds.is_video_present() or not ds.missing_segments():
-					log.debug(f'(YouTube {i}/{n_todownload}) {ds.competition}: Skipping, video or all segments found')
+					log.debug(f'(YouTube {i}/{n_todownload}) {ds.code_footage}: Skipping, video or all segments found')
 					todo_clip.append(ds)
 					continue
 
-				log.info(f'(YouTube {i}/{n_todownload}) {ds.competition}: Downloading... ({yt_id})')
+				log.info(f'(YouTube {i}/{n_todownload}) {ds.code_footage}: Downloading... ({yt_id})')
 
 				# Download video and send to clipper
-				self.yt_download(ds.competition, yt_id)
+				self.yt_download(ds.code_footage, yt_id)
 				todo_clip.append(ds)
 
-				log.info(f'(YouTube {i}/{n_todownload}) {ds.competition}: Downloading done ({yt_id})')
+				log.info(f'(YouTube {i}/{n_todownload}) {ds.code_footage}: Downloading done ({yt_id})')
 
 			except Exception as e:
-				log.error(f'(YouTube {i}/{n_todownload}) {ds.competition}: {e}', exc_info=e)
+				log.error(f'(YouTube {i}/{n_todownload}) {ds.code_footage}: {e}', exc_info=e)
 
 		# Number of downloaded videos
 		n_toclip = len(todo_clip)
@@ -246,23 +253,23 @@ class DatasetDownloader:
 
 				# Skip segment: no csv
 				if not ds.is_csv_present():
-					log.warning(f'(Clipper {i}/{n_toclip}) {ds.competition}: Skipping, CSV not found')
+					log.warning(f'(Clipper {i}/{n_toclip}) {ds.code_footage}: Skipping, CSV not found')
 					continue
 
 				# Skip segment: segments present
 				if not ds.missing_segments():
-					log.debug(f'(Clipper {i}/{n_toclip}) {ds.competition}: Skipping, all segments found')
+					log.debug(f'(Clipper {i}/{n_toclip}) {ds.code_footage}: Skipping, all segments found')
 					continue
 
-				log.info(f'(Clipper {i}/{n_toclip}) {ds.competition}: Segmenting...')
+				log.info(f'(Clipper {i}/{n_toclip}) {ds.code_footage}: Segmenting...')
 
 				# Segment the video
-				self.segment_video(ds.competition)
+				self.segment_video(ds.code_footage)
 
-				log.info(f'(Clipper {i}/{n_toclip}) {ds.competition}: Segmenting done')
+				log.info(f'(Clipper {i}/{n_toclip}) {ds.code_footage}: Segmenting done')
 
 			except Exception as e:
-				log.error(f'(Clipper {i}/{n_toclip}) {ds.competition}: {e}', exc_info=e)
+				log.error(f'(Clipper {i}/{n_toclip}) {ds.code_footage}: {e}', exc_info=e)
 
 		log.info('Finished downloading and segmenting all videos')
 
@@ -288,12 +295,12 @@ class DatasetDownloader:
 		for competition in self.yt_video_ids:
 			try:
 
-				ds = DatasetInstance(
-					competition=competition,
+				ds = LiveFootageInstance(
+					code_footage=competition,
 					dir_dataset=self.dir_dataset,
 					dir_segments=self.dir_segments,
 				)
-				ds.validate_dataset()
+				ds.load_dataset()
 				self.queue_yt.put(ds)
 
 			except Exception as e:
@@ -327,33 +334,33 @@ class DatasetDownloader:
 			try:
 
 				# Get YouTube id
-				yt_id = self.yt_video_ids[ds.competition]
+				yt_id = self.yt_video_ids[ds.code_footage]
 
 				# Skip download: no csv
 				if not ds.is_csv_present():
-					log.warning(f'(YouTube Consumer) {ds.competition}: Skipping, CSV not found')
+					log.warning(f'(YouTube Consumer) {ds.code_footage}: Skipping, CSV not found')
 					self.queue_yt.task_done()
 					continue
 
 				# Skip download: video present or segments present (send to clipper)
 				if ds.is_video_present() or not ds.missing_segments():
-					log.debug(f'(YouTube Consumer) {ds.competition}: Skipping, video or all segments found')
+					log.debug(f'(YouTube Consumer) {ds.code_footage}: Skipping, video or all segments found')
 					self.queue_clip.put(ds)
 					self.queue_yt.task_done()
 					continue
 
-				log.info(f'(YouTube Consumer) {ds.competition}: Downloading... ({yt_id})')
+				log.info(f'(YouTube Consumer) {ds.code_footage}: Downloading... ({yt_id})')
 
 				# Download video and send to clipper
-				self.yt_download(ds.competition, yt_id)
+				self.yt_download(ds.code_footage, yt_id)
 				self.queue_clip.put(ds)
 				self.queue_yt.task_done()
 
-				log.info(f'(YouTube Consumer) {ds.competition}: Downloading done ({yt_id})')
+				log.info(f'(YouTube Consumer) {ds.code_footage}: Downloading done ({yt_id})')
 
 			except Exception as e:
 				self.queue_yt.task_done()
-				log.error(f'(YouTube Consumer) {ds.competition}: {e}', exc_info=e)
+				log.error(f'(YouTube Consumer) {ds.code_footage}: {e}', exc_info=e)
 
 		# Signal the clipper consumer there are no more videos
 		self.queue_clip.put(None)
@@ -376,27 +383,27 @@ class DatasetDownloader:
 
 				# Skip segment: no csv
 				if not ds.is_csv_present():
-					log.warning(f'(Clipper Consumer) {ds.competition}: Skipping, CSV not found')
+					log.warning(f'(Clipper Consumer) {ds.code_footage}: Skipping, CSV not found')
 					self.queue_clip.task_done()
 					continue
 
 				# Skip segment: segments present
 				if not ds.missing_segments():
-					log.debug(f'(Clipper Consumer) {ds.competition}: Skipping, all segments found')
+					log.debug(f'(Clipper Consumer) {ds.code_footage}: Skipping, all segments found')
 					self.queue_clip.task_done()
 					continue
 
-				log.info(f'(Clipper Consumer) {ds.competition}: Segmenting...')
+				log.info(f'(Clipper Consumer) {ds.code_footage}: Segmenting...')
 
 				# Segment the video
-				self.segment_video(ds.competition)
+				self.segment_video(ds.code_footage)
 				self.queue_clip.task_done()
 
-				log.info(f'(Clipper Consumer) {ds.competition}: Segmenting done')
+				log.info(f'(Clipper Consumer) {ds.code_footage}: Segmenting done')
 
 			except Exception as e:
 				self.queue_clip.task_done()
-				log.error(f'(Clipper Consumer) {ds.competition}: {e}', exc_info=e)
+				log.error(f'(Clipper Consumer) {ds.code_footage}: {e}', exc_info=e)
 
 		return
 
