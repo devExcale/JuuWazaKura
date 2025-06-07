@@ -16,19 +16,64 @@ class Clipper:
 	Class for generating clips from a video file.
 	"""
 
-	def __init__(self, input_filepath: str, savedir: str, name: str, size: Optional[Tuple[int, int]] = None) -> None:
+	def __init__(
+			self,
+			input_filepath: str,
+			savedir: str,
+			name: str,
+			size: Optional[Tuple[int, int]] = None,
+			default_ms_end: int = 0,
+	) -> None:
 		"""
 		Initializes the Clipper object with the video file path.
+
+		:param input_filepath: Path to the video file
+		:param savedir: Directory where the output clips will be saved
+		:param name: Prefix for the output clips
+		:param size: Size of the output clips as a tuple (width, height).
+			If ``None``, the clips will be saved in the original size of the video.
+		:param default_ms_end: Default milliseconds to add to the end timestamp if no milliseconds are provided.
 		"""
+
 		self.input_filepath = input_filepath
+		""" Path to the input video file. """
+
 		self.root_dir = savedir
+		""" Root directory for saving the clips. """
+
 		self.name = name
+		""" Prefix for the output clips. """
+
 		self.output_size = size
+		""" Size of the output clips as a tuple (width, height). """
+
 		self.output_dir = os.path.join(self.root_dir, self.name)
+		""" Directory where the output clips will be saved. """
+
+		self.default_ms_end = default_ms_end
+		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
+
+		self.cap: cv2.VideoCapture | None = None
+		""" Video capture object for reading the video file. """
+
+		self.frame_size: tuple[int, int] | None = None
+		""" Size of the video frames as a tuple (width, height). """
+
+		self.frame_count: int = 0
+		""" Total number of frames in the video. """
+
+		self.fps: float = 0.0
+		""" Frames per second of the video. """
 
 		return
 
 	def __enter__(self) -> 'Clipper':
+		"""
+		Opens the video file and initializes the video capture object.
+
+		:return: ``self``
+		"""
+
 		# Open video file
 		cap = cv2.VideoCapture(self.input_filepath)
 
@@ -83,8 +128,8 @@ class Clipper:
 
 		# Convert timestamps to milliseconds and frame numbers
 		ms_start = int(ts_to_sec(start) * 1000)
-		ms_end = int(ts_to_sec(end) * 1000)
-		frame_start, frame_end = get_framestamp(start, end, self.fps)
+		ms_end = int(ts_to_sec(end, self.default_ms_end) * 1000)
+		frame_start, frame_end = get_framestamp(start, end, self.fps, self.default_ms_end)
 
 		# Check if the start and end frames are within the video length
 		if frame_start < 0 or frame_end < 0 or frame_start >= self.frame_count or frame_end >= self.frame_count:

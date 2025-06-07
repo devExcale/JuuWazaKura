@@ -52,6 +52,9 @@ class DatasetHandler:
 		self.tori_onehot: dict[str, np.ndarray] = {}
 		""" Mapping from tori value to the respective onehot encoding. """
 
+		self.default_ms_end: int = 0
+		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
+
 		self.finalized: bool = False
 
 		self.__apply_config__()
@@ -74,6 +77,7 @@ class DatasetHandler:
 		self.stats_columns = set(config['stats_columns'])
 		self.known_tori = set(normalize_label(s) for s in config['known_tori'])
 		self.known_throws = set(normalize_label(s) for s in config['known_throws'])
+		self.default_ms_end = config.get('default_ms_end', 0)
 
 		# Create mapping from throw alias to throw name (e.g., 'sawari seoi' -> 'sawari seoi nage')
 		self.throw_from_alias = {
@@ -268,7 +272,7 @@ class DatasetHandler:
 
 		# Check invalid timestamps order
 		start = ts_to_sec(ts_start)
-		end = ts_to_sec(ts_end)
+		end = ts_to_sec(ts_end, self.default_ms_end)
 		if start >= end:
 			raise ValueError(f"Invalid timestamps order: {row_id}")
 

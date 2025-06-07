@@ -1,82 +1,114 @@
-import argparse
+import click
 
 from .clipper import Clipper
 
-parser = argparse.ArgumentParser(
-	description='Segment a video file in multiple clips based on the timestamps in a dedicated CSV file.'
-)
 
-parser.add_argument(
+@click.group(name="clipper")
+def cmd_clipper():
+	"""
+	Clipper command line interface for generating video clips from timestamps.
+	"""
+
+	return
+
+
+@cmd_clipper.command(name="extract")
+@click.option(
 	'--video', '-v',
-	dest='video_path',
+	'video_path',
 	type=str,
-	help='Path to the video file',
 	required=True,
+	help='Path to the video file'
 )
-parser.add_argument(
+@click.option(
 	'--csv', '-t',
-	dest='csv_path',
+	'csv_path',
 	type=str,
-	help='Path to the CSV file containing the timestamps',
 	required=True,
+	help='Path to the CSV file containing the timestamps'
 )
-parser.add_argument(
+@click.option(
 	'-o',
-	dest='save_dir',
+	'save_dir',
 	type=str,
-	help='Output directory, defaults to the current directory',
-	required=False,
+	default='',
+	help='Output directory, defaults to the current directory'
 )
-parser.add_argument(
+@click.option(
 	'--name', '-n',
-	dest='name',
 	type=str,
-	help='Prefix of the output clips, defaults to the filename of the video',
-	required=False,
+	default=None,
+	help='Prefix of the output clips, defaults to the filename of the video'
 )
-parser.add_argument(
+@click.option(
 	'--width', '-w',
-	dest='width',
 	type=int,
-	help='Width of the output clips, defaults to the width of the input video. '
-		 'If the height isn\'t specified, the aspect ratio is preserved.',
-	required=False,
+	default=None,
+	help=(
+			'Width of the output clips, defaults to the width of the input video. '
+			'If the height isn\'t specified, the aspect ratio is preserved.'
+	)
 )
-parser.add_argument(
+@click.option(
 	'--height', '-g',
-	dest='height',
 	type=int,
-	help='Height of the output clips, defaults to the height of the input video. '
-		 'If the width isn\'t specified, the aspect ratio is preserved.',
-	required=False,
+	default=None,
+	help=(
+			'Height of the output clips, defaults to the height of the input video. '
+			'If the width isn\'t specified, the aspect ratio is preserved.'
+	)
 )
+@click.option(
+	'--default-ms-end', '-p',
+	type=int,
+	default=0,
+	help='If set, adds 999 milliseconds to the end timestamp if no milliseconds are provided.',
+)
+def cmd_extract(
+		video_path: str,
+		csv_path: str,
+		save_dir: str | None = None,
+		name: str | None = None,
+		width: str | None = None,
+		height: str | None = None,
+		default_ms_end: int = 0,
+) -> None:
+	"""
+	Generate video clips from a video file based on timestamps provided in a CSV file.
 
-
-def main():
-	# Get input arguments
-	args = parser.parse_args()
-
-	# Set default output directory
-	if args.save_dir is None:
-		args.save_dir = ''
+	:param video_path: Path to the video file from which to clip segments.
+	:param csv_path: Path to the CSV file containing the timestamps for clipping.
+	:param save_dir: Directory where the output clips will be saved. Defaults to the current directory.
+	:param name: Prefix for the output clips. If not specified, it defaults to the filename of the video without extension.
+	:param width: Width of the output clips. If specified, it overrides the width of the input video.
+	:param height: Height of the output clips. If specified, it overrides the height of the input video.
+	:param default_ms_end: Default milliseconds to add to the end timestamp if no milliseconds are provided.
+	:return: ``None``
+	"""
 
 	# Set default output name
-	if args.name is None:
-		args.name = '.'.join(args.video_path.split('/')[-1].split('.')[:-1])
+	if name is None:
+		name = '.'.join(video_path.split('/')[-1].split('.')[:-1])
 
 	# Get resize dimensions
-	if args.width is not None and args.height is not None:
-		args.output_size = (args.width, args.height)
-	elif args.width is not None:
-		args.output_size = (args.width, None)
-	elif args.height is not None:
-		args.output_size = (None, args.height)
+	if width is not None and height is not None:
+		output_size = (width, height)
+	elif width is not None:
+		output_size = (width, None)
+	elif height is not None:
+		output_size = (None, height)
 	else:
-		args.output_size = None
+		output_size = None
 
-	with Clipper(args.video_path, args.save_dir, args.name, args.output_size) as clipper:
-		clipper.export_from_csv(args.csv_path, sim=False)
+	with Clipper(
+			input_filepath=video_path,
+			savedir=save_dir,
+			name=name,
+			size=output_size,
+			default_ms_end=default_ms_end,
+	) as clipper:
+		clipper.export_from_csv(csv_path, sim=False)
 
 
 if __name__ == '__main__':
-	main()
+	cmd_clipper()

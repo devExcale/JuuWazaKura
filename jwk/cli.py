@@ -1,5 +1,6 @@
 import click
 
+from .clipper.__main__ import cmd_clipper
 from .dataset.__main__ import cmd_dataset
 from .devtools.__main__ import cmd_devtools
 from .model.__main__ import cmd_model
@@ -17,6 +18,7 @@ def cli() -> None:
 
 # List of subcommands
 subcommands = [
+	cmd_clipper,
 	cmd_dataset,
 	cmd_devtools,
 	cmd_model,

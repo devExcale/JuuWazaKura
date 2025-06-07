@@ -6,6 +6,7 @@
 		"throw",
 		"tori"
 	],
+	"default_ms_end": 999,
 	"stats_columns": [
 		"competition",
 		"throw",
