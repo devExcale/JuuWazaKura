@@ -6,7 +6,8 @@ import cv2
 import numpy as np
 
 from .gipick import main_picker, main_export
-from .yolov11 import annotate_competition_segments, apply_filter, video_annotate_objects
+from .plotting import cmd_plot
+from .yolov11 import annotate_competition_segments, apply_filter, video_annotate_objects_simple, video_annotate_objects
 from ..model import FrameBox
 from ..utils import MyEnv
 
@@ -160,9 +161,16 @@ def cmd_yolov11() -> None:
 	required=True,
 	help='Path to the output video file with annotations.'
 )
+@click.option(
+	'--custom', '-c',
+	is_flag=True,
+	default=False,
+	help='Annotate custom labels instead of YOLO labels.'
+)
 def cmd_annotate(
 		input_: str,
 		output: str,
+		custom: bool = False,
 ) -> None:
 	"""
 	Annotate competition segments with YOLOv11.
@@ -170,7 +178,10 @@ def cmd_annotate(
 	:return: ``None``
 	"""
 
-	video_annotate_objects(MyEnv.yolo_model, input_, output)
+	if not custom:
+		video_annotate_objects_simple(MyEnv.yolo_model, input_, output)
+	else:
+		video_annotate_objects(MyEnv.yolo_model, input_, output)
 
 	return
 
@@ -232,6 +243,110 @@ def compute_avg_gi_histogram() -> np.ndarray:
 
 	return avg_hist
 
+
+@cmd_devtools.command(name='colourprof')
+@click.option(
+	'--input', '-i', 'input_',
+	required=True,
+	help='Path to the video file to apply the color profile.'
+)
+@click.option(
+	'--output', '-o',
+	required=True,
+	help='Path to the output video file with the color profile applied.'
+)
+@click.option(
+	'--profile', '-p',
+	required=True,
+	help='Colour profile to apply (e.g., "HSV", "RGB").'
+)
+@click.option(
+	'--flat-channels', '-fc',
+	type=click.INT,
+	multiple=True,
+	default=None,
+	help='Optional list of channels to flatten (e.g., 0 for H in HSV).'
+)
+@click.option(
+	'--flat-values', '-fv',
+	type=click.FLOAT,
+	multiple=True,
+	default=None,
+	help='Optional list of values to flatten (e.g., 90 for H in HSV).'
+)
+def cmd_colourprof(
+		input_: str,
+		output: str,
+		profile: str,
+		flat_channels: list[int] | None = None,
+		flat_values: list[float] | None = None,
+) -> None:
+	"""
+	Saves the given video files as a new video with the color profile applied.
+
+	:param input_: Path to the input video file.
+	:param output: Path to the output video file.
+	:param profile: Colour profile to apply (e.g., "HSV", "RGB").
+	:param flat_channels: Optional list of channels to flatten (e.g., [0, 1] for H and S in HSV).
+	:param flat_values: Optional list of values to flatten (e.g., [90, 128] for H and S in HSV).
+	:return: ``None``
+	"""
+
+	if not os.path.isfile(input_):
+		raise FileNotFoundError(f"Input video file does not exist: {input_}")
+
+	if not output.endswith('.mp4'):
+		raise ValueError("Output file must have a .mp4 extension.")
+
+	# Check channel parameters
+	if flat_channels is not None and flat_values is not None:
+		if len(flat_channels) != len(flat_values):
+			raise ValueError("flat_channels and flat_values must have the same length.")
+
+	cv2_profile = cv2.__dict__.get(profile.upper(), None)
+	if cv2_profile is None:
+		cv2_profile = cv2.__dict__.get(f'COLOR_{profile.upper()}', None)
+	if cv2_profile is None:
+		raise ValueError(f"Invalid color profile: {profile}")
+
+	# Open the input video file
+	cap = cv2.VideoCapture(input_)
+	if not cap.isOpened():
+		raise ValueError(f"Error opening video file: {input_}")
+
+	# Get video properties
+	fps = cap.get(cv2.CAP_PROP_FPS)
+	width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+	height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+	# Define the codec and create VideoWriter object
+	fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+	out = cv2.VideoWriter(output, fourcc, fps, (width, height))
+
+	# Process each frame
+	while cap.isOpened():
+
+		ret, frame = cap.read()
+		if not ret:
+			break
+
+		# Convert the frame to the specified color profile
+		frame_converted = cv2.cvtColor(frame, cv2_profile)
+
+		if flat_channels is not None and flat_values is not None:
+			# Flatten specified channels
+			for channel, value in zip(flat_channels, flat_values):
+				if channel < 0 or channel >= frame_converted.shape[2]:
+					raise ValueError(f"Invalid channel index: {channel}")
+				frame_converted[:, :, channel] = value
+
+		# Write the converted frame to the output video
+		out.write(frame_converted)
+
+	return
+
+
+cmd_devtools.add_command(cmd_plot)
 
 if __name__ == '__main__':
 	cmd_devtools()

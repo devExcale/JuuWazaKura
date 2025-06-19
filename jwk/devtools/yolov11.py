@@ -1,15 +1,13 @@
+import logging
 import os
 
 import cv2
 import numpy as np
-
 from ultralytics import YOLO
-import logging
-
 from ultralytics.engine.results import Results
 
-from ..utils import MyEnv, get_logger, Drawing
 from ..model import FrameBox, Tracker
+from ..utils import MyEnv, get_logger, Drawing
 
 # Initialize logging
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
@@ -88,6 +86,49 @@ def video_annotate_objects(model: str, video_path: str, output_path: str):
 	out.release()
 
 	log.info(f"Saved output video file.")
+
+	return
+
+
+def video_annotate_objects_simple(model: str, video_path: str, output_path: str):
+	# Load the YOLO model
+	model = YOLO(model, verbose=False)
+
+	# Open the video file
+	cap = cv2.VideoCapture(video_path)
+	if not cap.isOpened():
+		log.error(f"Error opening video file: {video_path}")
+		return
+
+	log.debug(f"Opened video file: {video_path}")
+
+	# Get video properties
+	width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+	height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+	fps = cap.get(cv2.CAP_PROP_FPS)
+
+	# Define the codec and create VideoWriter object
+	fourcc = cv2.VideoWriter_fourcc(*'avc1')
+	out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+
+	log.debug(f"Output video file: {output_path}")
+
+	while cap.isOpened():
+
+		# Read the frame
+		ret, frame_in = cap.read()
+		if not ret:
+			break
+
+		results = model.predict(source=frame_in, verbose=False)
+		result = results[0]
+
+		out.write(result.plot())
+
+	cap.release()
+	out.release()
+
+	log.info(f"Saved output video file: {output_path}")
 
 	return
 
