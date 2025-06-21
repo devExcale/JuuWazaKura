@@ -55,7 +55,7 @@ class DatasetOrchestrator:
 		self.default_ms_end: int = 0
 		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
 
-		self.filters: list[Callable[[pd.Series], bool]] = []
+		self.filters: list[Callable[[str], bool]] = []
 		""" Filter to apply during finalization. """
 
 		self.finalized: bool = False
@@ -194,7 +194,7 @@ class DatasetOrchestrator:
 
 		return
 
-	def filter(self, predicate: Callable[[pd.Series], bool]) -> None:
+	def filter(self, predicate: Callable[[str], bool]) -> None:
 		"""
 		Filters the dataset using a predicate function.
 		The filter will be applied to each row of the DataFrame during the finalization step.
@@ -225,17 +225,30 @@ class DatasetOrchestrator:
 
 		flag_errors = False
 
+		rm_indices = []
+
 		# Loop over rows
 		for index, row in self.df.iterrows():
 			try:
-				self.__finalize_row__(index, row, group_throws=group_throws)
+
+				keep = self.__finalize_row__(index, row, group_throws=group_throws)
+				if not keep:
+					rm_indices.append(index)
+
 			except ValueError as e:
 				flag_errors = True
 				log.error(e)
+				break
 
 		# Raise error if any
 		if flag_errors:
 			raise ValueError("Fix dataset before proceeding")
+
+		# Remove rows that didn't pass the filters
+		if rm_indices:
+			log.info(f"Removing {len(rm_indices)} rows that didn't pass the filters")
+			self.df.drop(index=rm_indices, inplace=True)
+			self.df.reset_index(drop=True, inplace=True)
 
 		# Update actual labels
 		if group_throws:
@@ -331,7 +344,7 @@ class DatasetOrchestrator:
 
 		# Apply filters
 		for predicate in self.filters:
-			if not predicate(row):
+			if not predicate(throw):
 				return False
 
 		return True

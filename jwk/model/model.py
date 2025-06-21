@@ -77,17 +77,13 @@ class JwkModel:
 		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.livefootage_include), set(MyEnv.livefootage_exclude))
 
 		# Filter dataset
-		self.dataset.filter(lambda row: row['throw'] in [
+		self.dataset.filter(lambda throw: throw in [
 			"seoi_nage",
+			"uchi_gari",
 			"uchi_mata",
+			"soto_gari",
 			"sode_tsurikomi_goshi",
-			"o_uchi_gari",
 			"sumi_gaeshi",
-			# "kata_guruma",
-			# "tai_otoshi",
-			# "ko_soto_gari",
-			# "morote_seoi_nage",
-			# "tani_otoshi",
 		])
 
 		# Lock dataset
