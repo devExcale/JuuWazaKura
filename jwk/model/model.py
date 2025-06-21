@@ -77,14 +77,7 @@ class JwkModel:
 		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.livefootage_include), set(MyEnv.livefootage_exclude))
 
 		# Filter dataset
-		self.dataset.filter(lambda throw: throw in [
-			"seoi_nage",
-			"uchi_gari",
-			"uchi_mata",
-			"soto_gari",
-			"sode_tsurikomi_goshi",
-			"sumi_gaeshi",
-		])
+		self.dataset.filter(self.filter_rows)
 
 		# Lock dataset
 		self.dataset.finalize()
@@ -94,6 +87,24 @@ class JwkModel:
 		enable_model(self)
 
 		return
+
+	@staticmethod
+	def filter_rows(throw: str) -> bool:
+		"""
+		Filter rows based on the throw name.
+
+		:param throw: The throw type to filter by.
+		:return: True if the row should be included, False otherwise.
+		"""
+
+		return throw in [
+			"seoi_nage",
+			"uchi_gari",
+			"uchi_mata",
+			"soto_gari",
+			"sode_tsurikomi_goshi",
+			"sumi_gaeshi",
+		]
 
 	def fit_model(self, epochs=10):
 
