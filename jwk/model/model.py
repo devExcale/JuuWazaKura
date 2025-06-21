@@ -14,6 +14,7 @@ from keras.metrics import CategoricalAccuracy, Recall, Precision
 from tensorflow_addons.optimizers import AdamW
 
 from .arch.cnn2d_rnn import CNN2DRNN
+from .arch.cnn3d_rnn import CNN3DRNN
 from .keras_callbacks import MemoryCleanupCallback
 from ..dataset.ds_generator import DatasetBatchGenerator
 from ..dataset.ds_orchestrator import DatasetOrchestrator
@@ -161,7 +162,7 @@ class JwkModel:
 
 		return
 
-	def enable_2dcnn_lstm(self):
+	def enable_cnn2drnn(self):
 		"""
 		Configures a 2D CNN + LSTM model for variable-length sequences in batches.
 		Applies 2D CNNs per frame, then processes the sequence with an LSTM.
@@ -198,6 +199,43 @@ class JwkModel:
 
 		return
 
+	def enable_cnn3drnn(self):
+		"""
+		Configures a 2D CNN + LSTM model for variable-length sequences in batches.
+		Applies 2D CNNs per frame, then processes the sequence with an LSTM.
+		"""
+
+		if self.model is not None:
+			raise AssertionError("There's another model already enabled.")
+
+		self.batch_generator = DatasetBatchGenerator(
+			dataset=self.dataset,
+			frame_size=self.target_size,
+			frame_stride=3,
+			frame_stride_augment=True,
+		)
+
+		num_throws = len(self.dataset.throw_classes)
+
+		self.model = CNN3DRNN(self.target_size, num_throws, 3)
+		self.model.compile(
+			optimizer=self.optimizer,
+			loss={
+				'throw': self.loss_fn,
+				'tori': self.loss_fn
+			},
+			metrics={
+				'throw': [self.accuracy_throw],
+				'tori': [self.accuracy_tori],
+			},
+			loss_weights={
+				'throw': 0.8,
+				'tori': 0.2,
+			},
+		)
+
+		return
+
 	def save_weights(self, filepath):
 		"""
 		Save the model weights to a file.
@@ -215,7 +253,8 @@ class JwkModel:
 		return
 
 	models = {
-		'2dcnn_lstm': enable_2dcnn_lstm,
+		'cnn2drnn': enable_cnn2drnn,
+		'cnn3drnn': enable_cnn3drnn,
 	}
 
 
