@@ -17,9 +17,18 @@ def cmd_dataset():
 
 
 @cmd_dataset.command(name="stats")
-def cmd_stats():
+@click.option(
+	'--grouped', '-g',
+	default=False,
+	is_flag=True,
+	help='Whether to group similar throws together.'
+)
+def cmd_stats(grouped: bool = False) -> None:
 	"""
 	Compute and display dataset statistics.
+
+	:param grouped: Whether to group similar throws together.
+	:return: ``None``
 	"""
 
 	# Initialize dataset
@@ -27,19 +36,16 @@ def cmd_stats():
 
 	# Load all the data
 	handler.load_all(MyEnv.dataset_source)
-	handler.finalize()
-
-	# Find unknown throws
-	unknown_throws = handler.get_unknown_throws()
+	handler.finalize(group_throws=grouped)
 
 	# Compute statistics
 	stats = handler.compute_stats()
 
+	# Add unknown throws
+	stats['unknown'] = list(handler.get_unknown_throws())
+
 	# Print statistics (beautify)
 	click.echo(json.dumps(stats, indent=4))
-
-	# Print unknown throws
-	click.echo(f"Unknown throws: {unknown_throws}")
 
 	return
 

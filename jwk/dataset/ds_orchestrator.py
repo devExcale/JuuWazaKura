@@ -3,7 +3,7 @@ import logging
 import os
 from collections.abc import Callable
 from re import match
-from typing import Generator, Hashable
+from typing import Generator, Hashable, Any
 
 import cv2
 import numpy as np
@@ -210,12 +210,13 @@ class DatasetOrchestrator:
 
 		return
 
-	def finalize(self) -> None:
+	def finalize(self, group_throws: bool = True) -> None:
 		"""
 		Checks whether the loaded data is valid, morphs it if necessary, and locks it from further modifications.
 
-		:raise ValueError: If the data is not valid.
+		:param group_throws: If ``True``, throws will be mapped to their respective groups.
 		:return: ``None``
+		:raise ValueError: If the data is not valid.
 		"""
 
 		# Check if already finalized
@@ -227,7 +228,7 @@ class DatasetOrchestrator:
 		# Loop over rows
 		for index, row in self.df.iterrows():
 			try:
-				self.__finalize_row__(index, row)
+				self.__finalize_row__(index, row, group_throws=group_throws)
 			except ValueError as e:
 				flag_errors = True
 				log.error(e)
@@ -237,13 +238,21 @@ class DatasetOrchestrator:
 			raise ValueError("Fix dataset before proceeding")
 
 		# Update actual labels
-		self.throw_classes = list(sorted(
-			self.df['throw']
-			.map(normalize_label)
-			.map(lambda t: self.throw_from_alias.get(t, t))
-			.map(lambda t: self.throw_to_group.get(t, t))
-			.unique()
-		))
+		if group_throws:
+			self.throw_classes = list(sorted(
+				self.df['throw']
+				.map(normalize_label)
+				.map(lambda t: self.throw_from_alias.get(t, t))
+				.map(lambda t: self.throw_to_group.get(t, t))
+				.unique()
+			))
+		else:
+			self.throw_classes = list(sorted(
+				self.df['throw']
+				.map(normalize_label)
+				.map(lambda t: self.throw_from_alias.get(t, t))
+				.unique()
+			))
 		self.tori_classes = list(sorted(
 			self.df['tori']
 			.map(normalize_label)
@@ -266,7 +275,7 @@ class DatasetOrchestrator:
 
 		return
 
-	def __finalize_row__(self, index: Hashable, row: pd.Series) -> bool:
+	def __finalize_row__(self, index: Hashable, row: pd.Series, group_throws: bool = True) -> bool:
 		"""
 		Performs final checks on a row of the dataset and applies the needed transformations.
 		Filter predicates are applied after the row has been transformed:
@@ -274,6 +283,7 @@ class DatasetOrchestrator:
 
 		:param index: Index of the row.
 		:param row: Row data.
+		:param group_throws: If ``True``, throws will be mapped to their respective groups.
 		:return: ``True`` if the row should be kept, ``False`` otherwise.
 		"""
 
@@ -313,7 +323,8 @@ class DatasetOrchestrator:
 			raise ValueError(f"Unknown throw label: {row_id}")
 
 		# Map throw to group
-		throw = self.throw_to_group.get(throw, throw)
+		if group_throws:
+			throw = self.throw_to_group.get(throw, throw)
 
 		# Update the row
 		self.df.at[index, 'throw'] = throw
@@ -340,18 +351,82 @@ class DatasetOrchestrator:
 		# Remove mapped groups from unknown throws
 		return throws - set(self.throw_to_group.values())
 
-	def compute_stats(self) -> dict[str, dict[str, int]]:
+	def compute_stats(self) -> dict[str, Any]:
 		"""
 		Computes statistics from the data.
 		:return: Dictionary containing the computed statistics.
 		"""
 
+		log.info(f'Using default_ms_end: {self.default_ms_end}')
+
+		# Compute counts for each specified column
 		stats = {
 			column: self.df[column].value_counts().to_dict()
 			for column in self.stats_columns
 		}
 
-		stats['total'] = len(self.df)
+		# Include the total count of rows
+		stats['total_throw'] = len(self.df)
+
+		millis_start = lambda ts: int(ts_to_sec(ts) * 1000)
+		millis_end = lambda ts: int(ts_to_sec(ts, self.default_ms_end) * 1000)
+
+		# Compute the total footage duration for each throw
+		stats['duration'] = {
+			throw: (
+					self.df[self.df['throw'] == throw]['ts_end'].apply(millis_end) -
+					self.df[self.df['throw'] == throw]['ts_start'].apply(millis_start)
+			).sum()
+			for throw in self.throw_classes
+		}
+		stats['total_duration'] = sum(stats['duration'].values())
+
+		# Sort descending
+		stats['duration'] = dict(sorted(
+			stats['duration'].items(),
+			key=lambda item: item[1],
+			reverse=True
+		))
+
+		# Convert millis to [HH:]MM:SS.000 format
+		for throw, duration in stats['duration'].items():
+
+			# Calculate parameters
+			hours = duration // 3_600_000
+			minutes = (duration % 3_600_000) // 60_000
+			seconds = (duration % 60_000) // 1000
+			milliseconds = duration % 1000
+
+			# Format time
+			t = f'{minutes:02}:{seconds:02}.{milliseconds:03}'
+			if hours > 0:
+				t = f'{hours}:' + t
+
+			# Update time
+			stats['duration'][throw] = t
+
+		# Convert total duration to [HH:]MM:SS.000 format
+		hours = stats['total_duration'] // 3_600_000
+		minutes = (stats['total_duration'] % 3_600_000) // 60_000
+		seconds = (stats['total_duration'] % 60_000) // 1000
+		milliseconds = stats['total_duration'] % 1000
+
+		# Format total duration
+		t = f'{minutes:02}:{seconds:02}.{milliseconds:03}'
+		if hours > 0:
+			t = f'{hours}:' + t
+
+		stats['total_duration'] = t
+
+		# Add tori counts for each throw
+		stats['throw_white'] = {
+			throw: self.df[(self.df['throw'] == throw) & (self.df['tori'] == 'white')].shape[0]
+			for throw in self.throw_classes
+		}
+		stats['throw_blue'] = {
+			throw: self.df[(self.df['throw'] == throw) & (self.df['tori'] == 'blue')].shape[0]
+			for throw in self.throw_classes
+		}
 
 		return stats
 

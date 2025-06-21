@@ -5,10 +5,134 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ..dataset import DatasetOrchestrator
 from ..model import FrameBox
+from ..utils import MyEnv, ts_to_sec
 
 
-@click.command(name='plot')
+@click.group(name='plot')
+def cmd_plot() -> None:
+	"""
+	Plotting command line interface.
+	This module provides commands to plot Hue/Value histograms from images.
+	"""
+
+	return
+
+
+stat_keys = {
+	'throw': 'Numerosity',
+	'duration': 'Total Duration (seconds)',
+	'average': 'Average Duration (seconds)',
+}
+
+
+@cmd_plot.command(name='stats')
+@click.option(
+	'--output', '-o',
+	default=None,
+	help='Path to save the output plot image. If not set, the plot will be displayed on the screen.',
+)
+@click.option(
+	'--stat', '-t',
+	default='throw',
+	type=click.Choice(list(stat_keys.keys()), case_sensitive=False),
+	help='Statistic to plot: "throw" for numerosity, "duration" for duration (default: throw).',
+)
+@click.option(
+	'--sort', '-s',
+	default=0,
+	type=click.IntRange(0, 1),
+	help='Sort parameter: 0 - Name, 1 - Numerosity (default: 0).',
+)
+@click.option(
+	'--grouped', '-g',
+	default=False,
+	is_flag=True,
+	help='Whether to apply aliases and group similar throws together.',
+)
+def cmd_plot_stats(
+		output: str | None = None,
+		stat: str = 'throw',
+		sort: int = 0,
+		grouped: bool = False,
+) -> None:
+	"""
+	Plot statistics from the dataset.
+	This command computes the statistics of the dataset and plots the numerosity of each throw.
+
+	:param output: Path to save the output plot image; if not set, the plot will be displayed on the screen.
+	:param stat: Statistic to plot, 'throw' for numerosity, 'duration' for duration.
+	:param sort: Sorting parameter:
+	:param grouped: Whether to apply aliases and group similar throws together.
+	:return: ``None``
+	"""
+
+	# Initialize dataset
+	handler = DatasetOrchestrator()
+
+	# Load all the data
+	handler.load_all(MyEnv.dataset_source)
+	handler.finalize(group_throws=grouped)
+
+	# Compute statistics
+	stats = handler.compute_stats()
+
+	# Sort values
+	throws = stats[stat if stat != 'average' else 'duration']
+	throws = sorted(throws.items(), key=lambda item: item[sort], reverse=bool(sort))
+
+	if stat == 'duration':
+		# Convert duration from [HH:]MM:SS.000 to seconds (and decimal milliseconds)
+		throws = [(key, ts_to_sec(value)) for key, value in throws]
+	elif stat == 'average':
+		# Convert average duration from [HH:]MM:SS.000 to seconds (and decimal milliseconds)
+		throws = [(key, ts_to_sec(value, default_ms=0)) for key, value in throws]
+		# Get throws numerosity
+		n_throws = stats['throw']
+		# Average duration
+		throws = [(key, value / n_throws[key]) for key, value in throws]
+
+	# Split keys and values
+	throw_keys, throw_values = zip(*throws)
+
+	# Change names to Title Case
+	throw_keys = [key.replace('_', ' ').title() for key in throw_keys]
+
+	# Create plot
+	fix, ax = plt.subplots(figsize=(10, 6))
+
+	# Normalize values for color mapping
+	max_value = max(throw_values) if throw_values else 1
+	# noinspection PyUnresolvedReferences
+	colors = plt.cm.viridis(np.array(throw_values) / max_value)
+
+	# Create the horizontal bar plot.
+	ax.barh(throw_keys[::-1], throw_values[::-1], color=colors[::-1])
+
+	# Add labels and a title for clarity
+	ax.set_xlabel(stat_keys[stat])
+	ax.set_ylabel('Throw')
+	ax.set_title('Throws Statistics')
+
+	# Add the value label at the end of each bar for better readability
+	for index, value in enumerate(throw_values[::-1]):
+		ax.text(value, index, f' {value:.4}', va='center')
+
+	# Adjust layout to prevent labels from being cut off
+	plt.tight_layout()
+
+	# Save or show the plot
+	if output:
+		plt.savefig(output, dpi=400, bbox_inches='tight')
+		print(f"Saved plot to {output}")
+	else:
+		plt.show()
+
+	return
+
+
+@cmd_plot.command(name='histogram')
 @click.option(
 	'--input', '-i', 'input_',
 	required=True,
@@ -19,7 +143,7 @@ from ..model import FrameBox
 	default=None,
 	help='Path to save the output plot image. If not set, the plot will be displayed on the screen.'
 )
-def cmd_plot(
+def cmd_plot_histogram(
 		input_: str,
 		output: str | None = None,
 ) -> None:

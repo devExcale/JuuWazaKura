@@ -60,16 +60,31 @@
 		"seoi nage": [
 			"eri seoi nage",
 			"ippon seoi nage",
-			"sawari seoi nage"
+			"sawari seoi nage",
+			"morote seoi nage"
 		],
 		"ashi barai": [
 			"de ashi barai",
 			"okuri ashi barai"
 		],
-		"o soto gake": [
-			"o soto gake",
+		"soto gari": [
 			"o soto gari",
-			"o soto guruma"
+			"o soto gake",
+			"o soto guruma",
+			"ko soto gari",
+			"ko soto gake"
+		],
+		"uchi gari": [
+			"o uchi gari",
+			"o uchi gake",
+			"ko uchi gari",
+			"ko uchi gake",
+			"ko uchi barai",
+			"ko uchi makikomi"
+		],
+		"tomoe nage": [
+			"tomoe nage",
+			"yoko tomoe nage"
 		]
 	}
 }
