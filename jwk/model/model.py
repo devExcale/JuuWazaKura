@@ -17,7 +17,7 @@ from .arch.cnn2d_rnn import CNN2DRNN
 from .arch.cnn3d_rnn import CNN3DRNN
 from .keras_callbacks import MemoryCleanupCallback
 from ..dataset.ds_generator import DatasetBatchGenerator
-from ..dataset.ds_orchestrator import DatasetOrchestrator
+from ..dataset.ds_orchestrator import DatasetOrchestrator, DATASET_CUT_TRAINING, DATASET_CUT_TESTING
 from ..utils import MyEnv, get_logger
 
 # absl.logging.set_verbosity(absl.logging.ERROR)
@@ -33,6 +33,14 @@ if MyEnv.tf_dump_debug_info:
 		tensor_debug_mode="NO_TENSOR"
 	)
 
+THROW_CLASSES = {
+	"seoi_nage",
+	"uchi_gari",
+	"uchi_mata",
+	"soto_gari",
+	"sumi_gaeshi",
+}
+
 
 class JwkModel:
 	"""
@@ -46,8 +54,11 @@ class JwkModel:
 		:param model_type: Code of the model to enable.
 		"""
 
-		self.dataset: DatasetOrchestrator = DatasetOrchestrator()
-		""" Dataset orchestrator object. """
+		self.dataset: DatasetOrchestrator = DatasetOrchestrator(DATASET_CUT_TRAINING)
+		""" Training dataset orchestrator object. """
+
+		self.test_dataset: DatasetOrchestrator = DatasetOrchestrator(DATASET_CUT_TESTING)
+		""" Testing dataset orchestrator object. """
 
 		self.target_size: tuple[int, int] = (64, 64)
 		""" Target size of the input frames. """
@@ -74,15 +85,21 @@ class JwkModel:
 			raise ValueError(f'No model {model_type} found.')
 
 		# Load entire dataset (csv records)
-		self.dataset.load_all(MyEnv.dataset_source, set(MyEnv.livefootage_include), set(MyEnv.livefootage_exclude))
+		params = (MyEnv.dataset_source, MyEnv.livefootage_include, MyEnv.livefootage_exclude)
+		self.dataset.load_all(*params)
+		self.test_dataset.load_all(*params)
 
 		# Filter dataset
-		self.dataset.filter(self.filter_rows)
+		self.dataset.filter_throw(self.filter_rows)
 
 		# Lock dataset
 		self.dataset.finalize()
 
-		self.batch_generator: DatasetBatchGenerator | None = None
+		self.batch_generator_train: DatasetBatchGenerator | None = None
+		""" Batch generator for training dataset. """
+
+		self.batch_generator_test: DatasetBatchGenerator | None = None
+		""" Batch generator for testing dataset. """
 
 		enable_model(self)
 
@@ -97,14 +114,7 @@ class JwkModel:
 		:return: True if the row should be included, False otherwise.
 		"""
 
-		return throw in [
-			"seoi_nage",
-			"uchi_gari",
-			"uchi_mata",
-			"soto_gari",
-			"sode_tsurikomi_goshi",
-			"sumi_gaeshi",
-		]
+		return throw in THROW_CLASSES
 
 	def fit_model(self, epochs=10):
 
@@ -159,13 +169,17 @@ class JwkModel:
 		]
 
 		self.model.fit(
-			self.batch_generator,
+			self.batch_generator_train,
+			validation_data=self.batch_generator_test,
 			epochs=epochs,
 			workers=8,
 			use_multiprocessing=True,
 			max_queue_size=6,
 			callbacks=callbacks,
 		)
+
+		test_results = self.model.evaluate(self.batch_generator_test, verbose=1)
+		log.info(f"Test results: {test_results}")
 
 		return
 
@@ -178,11 +192,18 @@ class JwkModel:
 		if self.model is not None:
 			raise AssertionError("There's another model already enabled.")
 
-		self.batch_generator = DatasetBatchGenerator(
+		self.batch_generator_train = DatasetBatchGenerator(
 			dataset=self.dataset,
 			frame_size=self.target_size,
-			frame_stride=3,
+			frame_stride=2,
 			frame_stride_augment=True,
+		)
+
+		self.batch_generator_test = DatasetBatchGenerator(
+			dataset=self.test_dataset,
+			frame_size=self.target_size,
+			frame_stride=2,
+			frame_stride_augment=False,
 		)
 
 		num_throws = len(self.dataset.throw_classes)
@@ -215,11 +236,18 @@ class JwkModel:
 		if self.model is not None:
 			raise AssertionError("There's another model already enabled.")
 
-		self.batch_generator = DatasetBatchGenerator(
+		self.batch_generator_train = DatasetBatchGenerator(
 			dataset=self.dataset,
 			frame_size=self.target_size,
-			frame_stride=3,
+			frame_stride=2,
 			frame_stride_augment=True,
+		)
+
+		self.batch_generator_test = DatasetBatchGenerator(
+			dataset=self.test_dataset,
+			frame_size=self.target_size,
+			frame_stride=2,
+			frame_stride_augment=False,
 		)
 
 		num_throws = len(self.dataset.throw_classes)

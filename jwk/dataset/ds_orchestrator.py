@@ -14,10 +14,33 @@ from ..utils import MyEnv, get_logger, regex_ts, ts_to_sec
 
 log: logging.Logger = get_logger(__name__, MyEnv.log_level())
 
+DATASET_CUT_ALL: int = 0
+DATASET_CUT_TRAINING: int = 1
+DATASET_CUT_TESTING: int = 2
+
 
 class DatasetOrchestrator:
+	"""
+	Class to handle the dataset.
+	This class is responsible for loading the dataset and applying filters.
+	Moreover, it provides methods to compute statistics and retrieve data in a format suitable for training.
+	"""
 
-	def __init__(self) -> None:
+	def __init__(self, cut: int = DATASET_CUT_ALL) -> None:
+		"""
+		Initialize the dataset orchestrator object.
+
+		:param cut: Dataset cut to apply. If ``DATASET_CUT_ALL``, no cut is applied.
+		"""
+
+		self.cut: int = cut
+		""" Dataset cut to apply. """
+
+		if self.cut not in (DATASET_CUT_ALL, DATASET_CUT_TRAINING, DATASET_CUT_TESTING):
+			raise ValueError(
+				f'Invalid dataset cut: {self.cut}.'
+				f' Must be one of DATASET_CUT_ALL, DATASET_CUT_TRAINING, DATASET_CUT_TESTING.'
+			)
 
 		self.df = pd.DataFrame()
 		""" Main DataFrame to store the data. """
@@ -55,8 +78,11 @@ class DatasetOrchestrator:
 		self.default_ms_end: int = 0
 		""" Default milliseconds to add to the end timestamp if no milliseconds are provided. """
 
-		self.filters: list[Callable[[str], bool]] = []
-		""" Filter to apply during finalization. """
+		self.set_testing: set[str] = set()
+		""" Set of segments to use in the testing-cut. """
+
+		self.filters_throw: list[Callable[[str], bool]] = []
+		""" Filter on the throw class to apply during finalization. """
 
 		self.finalized: bool = False
 
@@ -81,6 +107,7 @@ class DatasetOrchestrator:
 		self.known_tori = set(normalize_label(s) for s in config['known_tori'])
 		self.known_throws = set(normalize_label(s) for s in config['known_throws'])
 		self.default_ms_end = config.get('default_ms_end', 0)
+		self.set_testing = set(config.get('set_testing', []))
 
 		# Create mapping from throw alias to throw name (e.g., 'sawari seoi' -> 'sawari seoi nage')
 		self.throw_from_alias = {
@@ -194,19 +221,19 @@ class DatasetOrchestrator:
 
 		return
 
-	def filter(self, predicate: Callable[[str], bool]) -> None:
+	def filter_throw(self, predicate: Callable[[str], bool]) -> None:
 		"""
 		Filters the dataset using a predicate function.
 		The filter will be applied to each row of the DataFrame during the finalization step.
 
-		:param predicate: Function that takes a row and returns True if it should be kept.
+		:param predicate: Function that takes a throw class and returns True if it should be kept.
 		"""
 
 		# Check if already finalized
 		self.__barrier_finalized__()
 
 		# Add predicate
-		self.filters.append(predicate)
+		self.filters_throw.append(predicate)
 
 		return
 
@@ -342,10 +369,17 @@ class DatasetOrchestrator:
 		# Update the row
 		self.df.at[index, 'throw'] = throw
 
-		# Apply filters
-		for predicate in self.filters:
-			if not predicate(throw):
+		# Apply filters - throw class
+		for predicate_throw in self.filters_throw:
+			if not predicate_throw(throw):
 				return False
+
+		# Filter on the dataset cut
+		segment_id = f'{name}-{int(start * 1000)}'
+		if self.cut == DATASET_CUT_TRAINING and segment_id in self.set_testing:
+			return False
+		elif self.cut == DATASET_CUT_TESTING and segment_id not in self.set_testing:
+			return False
 
 		return True
 
