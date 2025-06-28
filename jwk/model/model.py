@@ -94,6 +94,7 @@ class JwkModel:
 
 		# Lock dataset
 		self.dataset.finalize()
+		self.test_dataset.finalize()
 
 		self.batch_generator_train: DatasetBatchGenerator | None = None
 		""" Batch generator for training dataset. """
