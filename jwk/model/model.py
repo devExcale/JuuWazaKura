@@ -5,6 +5,7 @@ from typing import Callable
 
 # noinspection PyPackageRequirements
 import keras.mixed_precision
+import numpy as np
 import psutil
 import tensorflow as tf
 from keras import Model
@@ -179,8 +180,25 @@ class JwkModel:
 			callbacks=callbacks,
 		)
 
-		test_results = self.model.evaluate(self.batch_generator_test, verbose=1)
-		log.info(f"Test results: {test_results}")
+		# Compute confusion matrix
+		n_test = len(self.batch_generator_test)
+		y_true = []
+		y_pred = []
+
+		for batch_idx in range(n_test):
+			x, y = self.batch_generator_test[batch_idx]
+			predictions = self.model.predict(x, verbose=0)
+
+			y_true.append(np.argmax(y['throw'][0]))
+			y_pred.append(np.argmax(predictions['throw'][0]))
+
+		confusion = tf.math.confusion_matrix(
+			y_true,
+			y_pred,
+			num_classes=len(self.dataset.throw_classes),
+			dtype=tf.int32
+		)
+		log.info(f"Confusion matrix:\n{confusion.numpy()}")
 
 		return
 
